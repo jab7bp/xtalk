@@ -4,9 +4,11 @@
 #include <iomanip>
 #include <math.h>
 #include <algorithm>
+#include <string>
 
 #include "./include/include_files.h"
 #include "./include/APV_strips.h"
+#include "./include/search_file.C"
 
 //Define some global variables
 int apv_chan_adc[128][2];
@@ -16,18 +18,49 @@ Int_t max_strips = (3840);
 Int_t max_events = 100;
 Int_t nAPV_strips = 128;
 
+int single_apv = 13;
+
 //********BOOLEANS********//
+bool build_APV_occupancy = true;
 bool plot_APV_occupancy = true; 
+bool save_APV_occupancy = true;
+bool build_APV_occupancy_U = true;
 bool plot_APV_occupancy_U = true;
 bool save_APV_occupancy_U = true;
 
-void xtalk(int runnum = 13656){ 
+bool build_total_occupancy = true;
+bool plot_total_occupancy = true;
+bool save_total_occupancy = true;
+bool build total_occupancy_U = true;
+bool plot_total_occupancy_U = true;
+bool save_total_occupancy_U = true;
 
-	const char * DATA_DIR = "/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/before_cuts/";
-	const char * protorootfile = Form("e1209019_replayed_%i.root", runnum);
+bool build_ratio_single = true;
+bool plot_ratio_single = true;
+bool save_ratio_single = true;
+
+bool build_ratio_all = true;
+bool plot_ratio_all = true;
+bool save_ratio_all = true;
+
+// for(int cut_cnt = 0; cut_cnt < (sizeof(db_cuts)/sizeof(db_cuts[0])); cut_cnt++){
+// 	tpt_db_cuts->AddText(db_cuts[cut_cnt]);
+// }
+
+void xtalk(int runnum = 13444, const char *cut = "1A"){ 
+	
+	const char * DATA_DIR = "/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/";
+	// const char * protorootfile = Form("e1209019_replayed_%i.root", runnum);
+	// const char * protorootfile = Form("e1209019_fullreplay_%i_*", runnum);
+	const char * protorootfile = Form("e1209019_replayed_%i_%s.root", runnum, cut);
+	// const char * protorootfile = "e1209019_fullreplay_13656_stream0_seg9_9.root";
+	// const char * protorootfile = Form("*%i*%s*", runnum, cut);
 
 	TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
 	cout << "Input rootfile is: " << rootfile << endl;
+
+	//Loop for Chain
+	
 
 	TChain *TC = new TChain("T");
 	TC->Add( rootfile );
@@ -37,6 +70,29 @@ void xtalk(int runnum = 13656){
 	myfile.open("output.txt");
 	myfile << "occupancy: \n \n";
 	myfile << "-------------------------" << endl;
+
+	//Cuts from db_bb.gem.dat
+	TString db_cuts[] = {
+		search_file("bb.gem.threshold_sample"),
+		search_file("bb.gem.threshold_stripsum"),
+		search_file("bb.gem.threshold_clustersum"),
+		search_file("bb.gem.ADCasym_cut"),
+		search_file("bb.gem.maxstrip_t0"),
+		search_file("bb.gem.maxstrip_tcut"),
+		search_file("bb.gem.addstrip_tcut"),
+		search_file("bb.gem.addstrip_ccor_cut"),
+		search_file("bb.gem.suppressfirstlast"),
+		search_file("bb.gem.deltat_cut"),
+		search_file("bb.gem.corrcoeff_cut")};
+	TPaveText *tpt_db_cuts = new TPaveText(0.4, 50.0, 0.65, 105.0);
+	TText *db_cuts_title = tpt_db_cuts->AddText("Tracking Cuts:");
+	db_cuts_title->SetTextFont(53);
+	db_cuts_title->SetTextSize(12);
+	for(int k = 0; k < (sizeof(db_cuts)/sizeof(db_cuts[0])); k++){
+			tpt_db_cuts->AddText(db_cuts[k]);
+		}
+	
+	// string searched_var = search_file("bb.gem.maxstrip_t0");
 
 	//Turn off all Branches to save memory/time
 	TC->SetBranchStatus("*", false);
@@ -116,11 +172,12 @@ void xtalk(int runnum = 13656){
 	int last_apv = nAPVs;
 	
 	double apv_occupancy_mean[nAPVs];
-	TPaveLabel *tpl_apv_occupancy_mean[nAPVs];
+	//LABELS and Lines
+	TPaveLabel *tpl_apv_occupancy_mean_U[nAPVs];
 	TLine *tl_apv_occupancy_lines[nAPVs];
 
 	//Histogram with all individual APV occupancies
-	TH1D *h_all_APV_occupancies = new TH1D("h_all_APV_occupancies", "", (occupancy_bin_num*nAPVs), 0.0, double(nAPVs));
+	TH1D *h_all_APV_occupancies_U = new TH1D("h_all_APV_occupancies_U", "", (occupancy_bin_num*nAPVs), 0.0, double(nAPVs));
 
 	//Grab some maximum values to use as limits and constraints
 	int first_occupancy_bin = first_apv*occupancy_bin_num;
@@ -148,7 +205,7 @@ void xtalk(int runnum = 13656){
 	cout << endl << "Run number: " << runnum << endl;
 	cout << endl << "Calculating total occupancy on layer." << endl;
 	
-	TH1D *h_total_occupancy = new TH1D("h_total_occupancy", "", occupancy_bin_num, 0, 1);
+	TH1D *h_total_occupancy = new TH1D("h_total_occupancy_all_strips", "", occupancy_bin_num, 0, 1);
 	TH1D *h_total_occupancy_U = new TH1D("h_total_occupancy_U", "", occupancy_bin_num, 0, 1);
 	int total_event_num = 0;
 	double total_occupancy = 0;
@@ -167,22 +224,23 @@ void xtalk(int runnum = 13656){
 
 	TCanvas *c_total_occupancy = new TCanvas("c_total_occupancy", "", 700, 500);
 	h_total_occupancy->Draw();
-	h_total_occupancy->SetTitle(Form("Total Occupancy On GEM, All strips, All events - Run: %i", runnum));
+	h_total_occupancy->SetTitle(Form("Total Occupancy On GEM, All strips, All events - Run: %i - Cut: %s", runnum, cut));
 	h_total_occupancy->GetXaxis()->SetTitle("Occupancy");
 	h_total_occupancy->SetAxisRange(0, last_occupancy_bin, "X");
 	h_total_occupancy->GetYaxis()->SetTitle("Entries");
+	tpt_db_cuts->Draw();
 	c_total_occupancy->Update();
-	c_total_occupancy->Print(Form("/work/halla/sbs/jboyd/analysis/CrossTalk/plots/total_occupancy_%i.pdf",runnum));
+	c_total_occupancy->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%s/total_occupancy_%i_%s.pdf", cut, runnum, cut));
 
 
 	TCanvas *c_total_occupancy_U = new TCanvas("c_total_occupancy_U", "", 700, 500);
 	h_total_occupancy_U->Draw();
-	h_total_occupancy_U->SetTitle(Form("Total Occupancy On GEM U Strips, ALL Events - Run: %i", runnum));
+	h_total_occupancy_U->SetTitle(Form("Total Occupancy On GEM U Strips, ALL Events - Run: %i - Cut: %s", runnum, cut));
 	h_total_occupancy_U->GetXaxis()->SetTitle("Occupancy");
 	h_total_occupancy_U->SetAxisRange(0, last_occupancy_bin_U, "X");
 	h_total_occupancy_U->GetYaxis()->SetTitle("Entries");
 	c_total_occupancy_U->Update();
-	c_total_occupancy_U->Print(Form("/work/halla/sbs/jboyd/analysis/CrossTalk/plots/total_occupancy_U_%i.pdf",runnum));
+	c_total_occupancy_U->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%s/total_occupancy_U_%i_%s.pdf", cut, runnum, cut));
 	
 	cout << "Analyzing data for APVs " << first_apv << " through " << last_apv << "." << endl;
 
@@ -256,27 +314,30 @@ void xtalk(int runnum = 13656){
 			double chan_n_plus_1_ADC = 0.0;
 			double ADC_ratio = 0.0;
 
+//*****************************/
+//*********RATIOS**************/
+			if(plot_ratio_all){
 			//SCANNING THROUGH THE FILLED HISTOGRAMS
-			for(int i = 0; i < 127; i++){
-				double chan_n_adc = apv_chan_adc[i][1];
-				double chan_n_plus_1_ADC = apv_chan_adc[i+1][1];
-				double ADC_ratio = 0.0;
+				for(int i = 0; i < 127; i++){
+					double chan_n_adc = apv_chan_adc[i][1];
+					double chan_n_plus_1_ADC = apv_chan_adc[i+1][1];
+					double ADC_ratio = 0.0;
 
-				//Always take larger ADC divided by smaller ADC for neighboring channels
-				if(chan_n_adc > chan_n_plus_1_ADC && chan_n_plus_1_ADC != 0 && chan_n_adc > ADC_cut){
-					double ADC_ratio = chan_n_adc/chan_n_plus_1_ADC;
-					h_APV_U_ADCmax_chan_ratios[apv_cnt]->Fill(ADC_ratio);
-					h2_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt]->Fill(chan_n_adc, chan_n_plus_1_ADC);
+					//Always take larger ADC divided by smaller ADC for neighboring channels
+					if(chan_n_adc > chan_n_plus_1_ADC && chan_n_plus_1_ADC != 0 && chan_n_adc > ADC_cut){
+						double ADC_ratio = chan_n_adc/chan_n_plus_1_ADC;
+						h_APV_U_ADCmax_chan_ratios[apv_cnt]->Fill(ADC_ratio);
+						h2_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt]->Fill(chan_n_adc, chan_n_plus_1_ADC);
+					}
+					else if(chan_n_plus_1_ADC > chan_n_adc && chan_n_adc != 0 && chan_n_plus_1_ADC > ADC_cut){
+						double ADC_ratio = chan_n_plus_1_ADC/chan_n_adc;
+						h_APV_U_ADCmax_chan_ratios[apv_cnt]->Fill(ADC_ratio);
+						h2_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt]->Fill(chan_n_plus_1_ADC, chan_n_adc);
+					}
+					//Fill channel n on the y-axis. Fill channel n+1 on the x-axis. 
+					h2_APV_U_ADCmax_neigh_chan[apv_cnt]->Fill(chan_n_plus_1_ADC, chan_n_adc);
 				}
-				else if(chan_n_plus_1_ADC > chan_n_adc && chan_n_adc != 0 && chan_n_plus_1_ADC > ADC_cut){
-					double ADC_ratio = chan_n_plus_1_ADC/chan_n_adc;
-					h_APV_U_ADCmax_chan_ratios[apv_cnt]->Fill(ADC_ratio);
-					h2_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt]->Fill(chan_n_plus_1_ADC, chan_n_adc);
-				}
-				//Fill channel n on the y-axis. Fill channel n+1 on the x-axis. 
-				h2_APV_U_ADCmax_neigh_chan[apv_cnt]->Fill(chan_n_plus_1_ADC, chan_n_adc);
 			}
-
 		//End of looping through events
 		}
 
@@ -395,42 +456,49 @@ void xtalk(int runnum = 13656){
 		// c_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt]->Update();
 		
 		//SAVE APV OCCUPANCY PLOTS TO PDF
+		double last_APV_occupancy_bin_U = (h_APV_occupancy_U[apv_cnt]->FindLastBinAbove(0, 1) + 500)/double(occupancy_bin_num);
+
 		if(plot_APV_occupancy_U){
 			TCanvas *c_APV_occupancy_U[nAPVs];
 			c_APV_occupancy_U[apv_cnt] = new TCanvas(Form("c_APV%i_occupancy_U", apv_cnt), "", 700, 500);
 			if(apv_cnt == first_apv){
 				h_APV_occupancy_U[apv_cnt]->Draw();
-				h_APV_occupancy_U[apv_cnt]->SetTitle(Form("Occupancy on APV %i - Ustrips Only", apv_cnt));
+				h_APV_occupancy_U[apv_cnt]->SetTitle(Form("Occupancy on APV %i - Run: %i - Cut: %s - Ustrips Only", apv_cnt, runnum, cut));
 				h_APV_occupancy_U[apv_cnt]->GetXaxis()->SetTitle("Occupancy");
 				h_APV_occupancy_U[apv_cnt]->GetYaxis()->SetTitle("Entries");
+				h_APV_occupancy_U[apv_cnt]->SetAxisRange(0, last_APV_occupancy_bin_U, "X");
 				c_APV_occupancy_U[apv_cnt]->Update();
-				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/CrossTalk/plots/APV_occupancy_U_%i.pdf(", runnum));
-				c_APV_occupancy_U[apv_cnt]->Clear();
+				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%s/APV_occupancy_U_%i_%s.pdf(", cut, runnum, cut));
+				// c_APV_occupancy_U[apv_cnt]->Clear();
 			}
 			else if (apv_cnt > first_apv && apv_cnt < (last_apv-1)){
 				h_APV_occupancy_U[apv_cnt]->Draw();
-				h_APV_occupancy_U[apv_cnt]->SetTitle(Form("Occupancy on APV %i - Ustrips Only", apv_cnt));
+				h_APV_occupancy_U[apv_cnt]->SetTitle(Form("Occupancy on APV %i - Run: %i - Cut: %s - Ustrips Only", apv_cnt, runnum, cut));
 				h_APV_occupancy_U[apv_cnt]->GetXaxis()->SetTitle("Occupancy");
 				h_APV_occupancy_U[apv_cnt]->GetYaxis()->SetTitle("Entries");
+				h_APV_occupancy_U[apv_cnt]->SetAxisRange(0, last_APV_occupancy_bin_U, "X");
 				c_APV_occupancy_U[apv_cnt]->Update();
-				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/CrossTalk/plots/APV_occupancy_U_%i.pdf", runnum));
-				c_APV_occupancy_U[apv_cnt]->Clear();
+				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%s/APV_occupancy_U_%i_%s.pdf", cut, runnum, cut));
+				// c_APV_occupancy_U[apv_cnt]->Clear();
 			}
-			if(apv_cnt == (last_apv -1)){
+			if(apv_cnt == (last_apv - 1)){
 				h_APV_occupancy_U[apv_cnt]->Draw();
-				h_APV_occupancy_U[apv_cnt]->SetTitle(Form("Occupancy on APV %i - Ustrips Only", apv_cnt));
+				h_APV_occupancy_U[apv_cnt]->SetTitle(Form("Occupancy on APV %i - Run: %i - Cut: %s - Ustrips Only", apv_cnt, runnum, cut));
 				h_APV_occupancy_U[apv_cnt]->GetXaxis()->SetTitle("Occupancy");
 				h_APV_occupancy_U[apv_cnt]->GetYaxis()->SetTitle("Entries");
+				h_APV_occupancy_U[apv_cnt]->SetAxisRange(0, last_APV_occupancy_bin_U, "X");
 				c_APV_occupancy_U[apv_cnt]->Update();
-				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/CrossTalk/plots/APV_occupancy_U_%i.pdf)", runnum));
+				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%s/APV_occupancy_U_%i_%s.pdf)", cut, runnum, cut));
 				
 			}
+			c_APV_occupancy_U[apv_cnt]->Close();
+			gSystem->ProcessEvents();
 		}
 
-		//Put each APV occupancy histogram into the histogram for all APV h_all_APV_occupancies
+		//Put each APV occupancy histogram into the histogram for all APV h_all_APV_occupancies_U
 		int apv_occupancy_bin = 0;
 		for(int bin_cnt = first_occupancy_bin; bin_cnt < (first_occupancy_bin + occupancy_bin_num); bin_cnt ++){
-			h_all_APV_occupancies->SetBinContent(bin_cnt, h_APV_occupancy_U[apv_cnt]->GetBinContent(apv_occupancy_bin));
+			h_all_APV_occupancies_U->SetBinContent(bin_cnt, h_APV_occupancy_U[apv_cnt]->GetBinContent(apv_occupancy_bin));
 			apv_occupancy_bin++;
 		}
 		
@@ -439,35 +507,33 @@ void xtalk(int runnum = 13656){
 	// cout<< "mean: " << h_APV_occupancy_U[13]->GetMean();
 	
 	
-	
-	
-	
-
 		
 	//END OF APV_CNT LOOP
 	}
 	
-	TCanvas *c_all_APV_occupancies = new TCanvas("c_all_APV_occupancies", "", 700, 500);
-	h_all_APV_occupancies->Draw("same");
-	h_all_APV_occupancies->SetTitle("Occupancies on individual APVs - Ustrips only");
-	h_all_APV_occupancies->GetXaxis()->SetTitle("APVs and respective occupany bins (0.0 - 0.30)");
-	h_all_APV_occupancies->GetYaxis()->SetTitle("Entries");
-	c_all_APV_occupancies->Update();
-	
+	TCanvas *c_all_APV_occupancies_U = new TCanvas("c_all_APV_occupancies_U", "", 700, 500);
+	h_all_APV_occupancies_U->Draw("same");
+	h_all_APV_occupancies_U->SetStats(0);
+	h_all_APV_occupancies_U->SetTitle(Form("Occupancies on individual APVs - Run: %i - Cut: %s - Ustrips only", runnum, cut));
+	h_all_APV_occupancies_U->GetXaxis()->SetTitle("APVs and respective occupany bins (0.0 - 0.30)");
+	h_all_APV_occupancies_U->GetYaxis()->SetTitle("Entries");
+	c_all_APV_occupancies_U->Update();
+	cout << "h_apv_occ_u: " << (h_all_APV_occupancies_U->GetMaximum())*(2.0/3.0) << endl;
 	for(int apv = first_apv; apv < last_apv; apv++){
-		tpl_apv_occupancy_mean[apv] = new TPaveLabel(apv +.15, h_all_APV_occupancies->GetMaximum()-2000, apv +.85, h_all_APV_occupancies->GetMaximum()+200, Form("APV %i, Mean = %0.3f", apv, h_APV_occupancy_U[apv]->GetMean()));
-		tpl_apv_occupancy_mean[apv]->SetBorderSize(1);
-		tpl_apv_occupancy_mean[apv]->SetTextAngle(90.);
-		tpl_apv_occupancy_mean[apv]->SetTextFont(53);
-		tpl_apv_occupancy_mean[apv]->SetTextSize(12);
-		tpl_apv_occupancy_mean[apv]->Draw();
-		tl_apv_occupancy_lines[apv] = new TLine(apv, 0, apv, h_all_APV_occupancies->GetMaximum()+200);
+		tpl_apv_occupancy_mean_U[apv] = new TPaveLabel(apv +.15, (h_all_APV_occupancies_U->GetMaximum())*(2.0/3.0), apv +.85, (h_all_APV_occupancies_U->GetMaximum()), Form("APV %i, Mean = %0.3f", apv, h_APV_occupancy_U[apv]->GetMean()));
+		// tpl_apv_occupancy_mean_U[apv] = new TPaveLabel(apv +.15, 140, apv +.85, 230, Form("APV %i, Mean = %0.3f", apv, h_APV_occupancy_U[apv]->GetMean()));
+		tpl_apv_occupancy_mean_U[apv]->SetBorderSize(1);
+		tpl_apv_occupancy_mean_U[apv]->SetTextAngle(90.);
+		tpl_apv_occupancy_mean_U[apv]->SetTextFont(53);
+		tpl_apv_occupancy_mean_U[apv]->SetTextSize(12);
+		tpl_apv_occupancy_mean_U[apv]->Draw();
+		tl_apv_occupancy_lines[apv] = new TLine(apv, 0, apv, (h_all_APV_occupancies_U->GetMaximum())*(1.05));
 		tl_apv_occupancy_lines[apv]->SetLineStyle(4);
 		tl_apv_occupancy_lines[apv]->Draw();
-		c_all_APV_occupancies->Update();
+		c_all_APV_occupancies_U->Update();
 	}
 
-	c_all_APV_occupancies->Print(Form("/work/halla/sbs/jboyd/analysis/CrossTalk/plots/APV_all_occupancies_%i.pdf", runnum));
+	c_all_APV_occupancies_U->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%s/APV_all_occupancies_%i_%s.pdf", cut, runnum, cut));
 
 ///////////////////
 //END OF MAIN LOOP
