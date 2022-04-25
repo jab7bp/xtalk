@@ -44,7 +44,7 @@ double APV_strip_nums(int APV, TString minmax){
 
 int UV_APV_strip_to_channel(int strip) {
 	
-	//Mapping for APV channel to strip
+	//Mapping for APV strip to channel
 	const int _mapped_strip_uva_uv[128] = {
 	     31,  15, 127, 111,  27,  11, 123, 107,  23,   7,
 	    119, 103,  19,   3, 115,  99,  30,  14, 126, 110,
@@ -73,6 +73,41 @@ int UV_APV_strip_to_channel(int strip) {
 		return APV_channel;
 	}
 	
+}
+
+
+int UV_APV_channel_to_strip(int channel) {
+
+	//Mapping for APV multiplexer strip to channel
+	const int _mapped_channel_uva_uv[128] = {
+		61,   45,  29,  13,  57,  41,  25,  9,   53,  37,
+		21,    5,  49,  33,  17,   1,  60,  44,  28,  12,
+		56,   40,  24,   8,  52,  36,  20,   4,  48,  32,
+		16,    0,  64,  80,  96, 112,  68,  84, 100, 116,
+		72,   88, 104, 120,  76,  92, 108, 124,  65,  81,
+		97,  113,  69,  85, 101, 117,  73,  89, 105, 121,
+		77,   93, 109, 125,  66,  82,  98, 114,  70,  86,
+		102, 118,  74,  90, 106, 122,  78,  94, 110, 126, 
+		67,   83,  99, 115,  71,  87, 103, 119,  75,  91,
+		107, 123,  79,  95, 111, 127,  63,  47,  31,  15,
+		59,   43,  27,  11,  55,  39,  23,   7,  51,  35,
+		19,    3,  62,  46,  30,  14,  58,  42,  26,  10,
+		54,   38,  22,   6,   5,  34,  18,   2
+	};	
+	
+	if(channel >= 128){
+		cout << endl << " WARNING!!! APVs only have channels from 0 - 127. Cannot have channels >= 128." << endl;
+		int APV_channel = 99999;
+		return APV_channel;
+	}
+
+	else{
+		int n = sizeof(_mapped_channel_uva_uv)/sizeof(_mapped_channel_uva_uv[0]);
+		auto strip = find(_mapped_channel_uva_uv, _mapped_channel_uva_uv + n, channel);
+		int APV_strip = distance(_mapped_channel_uva_uv, strip);
+		return APV_strip;
+	}
+
 }
 
 #endif

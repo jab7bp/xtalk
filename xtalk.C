@@ -5,13 +5,15 @@
 #include <math.h>
 #include <algorithm>
 #include <string>
+#include <chrono>
+using namespace std::chrono;
 
 #include "./include/include_files.h"
 #include "./include/APV_strips.h"
 #include "./include/search_file.C"
 
 //Define some global variables
-int const ADC_cut = 700;
+
 int apv_chan_adc[128][2];
 int apv_strip_adc[128][2];
 int nstrips = 3840;
@@ -21,12 +23,16 @@ Int_t gaus_min_bin;
 Int_t gaus_max_bin;
 
 //********BOOLEANS********//
-bool build_APV_occupancy = false; 
+bool build_total_occupancy = false;
+bool build_APV_occupancy = true; 
 bool build_APV_occupancy_U = false;
-bool save_APV_occupancy_U = false;
+bool save_APV_occupancy_U = true;
 bool build_ratio_all = true;
 bool build_ratio_single = true;
 bool fit_gaus = false;
+
+bool save_all = true;
+bool run_time = false;
 
 TF1 *xtalk_gaus;
 TF1 *xtalk_fit;
@@ -36,28 +42,30 @@ TF1 *xtalk_fit;
 // 	tpt_db_cuts->AddText(db_cuts[cut_cnt]);
 // }
 
-void xtalk(int runnum = 12060){ 
+void xtalk(int runnum = 12060, int const ADC_cut = 500){ 
+
+	// auto start = high_resolution_clock::now();
 	TChain *TC = new TChain("T");
 	// const char * DATA_DIR = Form("/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/%i/", runnum);
 	// const char * DATA_DIR = Form("/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/%i/", runnum);
 	const char * DATA_DIR = "/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/";
-	// const char * protorootfile = Form("e1209019_fullreplay_%i_stream0_seg0_0.root", runnum);
-	// const char * protorootfile = Form("e1209019_replayed_%i.root", runnum);
+	// const char * protorootfile = Form("%i/e1209019_fullreplay_%i_stream*", runnum, runnum);
+	const char * protorootfile = Form("%i/e1209019_replayed_%i.root", runnum, runnum);
 	// const char * protorootfile = Form("e1209019_replayed_%i_%s.root", runnum, cut);
-	const char * protorootfile = Form("e1209019_fullreplay_%i_*", runnum);
+	// const char * protorootfile = Form("%i/e1209019_fullreplay_%i_*", runnum, runnum);
 	// const char * protorootfile = Form("*%i*%s*", runnum, cut);
 	// const char * protorootfile = "*";
 
-	// TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
-	// cout << "Input rootfile is: " << rootfile << endl;
-	// TC->Add( rootfile );
+	TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
+	cout << "Input rootfile is: " << rootfile << endl;
+	TC->Add( rootfile );
 
-	for(int seg=0; seg < 10; seg++){
-		protorootfile = Form("/%i/e1209019_replayed_%i.root", runnum, runnum);
-		TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
-		TC->Add( rootfile );
+	// for(int seg=0; seg < 10; seg++){
+	// 	protorootfile = Form("/%i/e1209019_replayed_%i.root", runnum, runnum);
+	// 	TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
+	// 	TC->Add( rootfile );
 		
-	}
+	// }
 
 	// Loop for Chain
 	// const char * protorootfile;
@@ -172,12 +180,13 @@ void xtalk(int runnum = 12060){
 	//where that main loop starts.
 	int nAPVs = 30;
 	int occupancy_bin_num = 10000;
-	int first_apv = 10;
-	int last_apv = 20;
+	int first_apv = 11;
+	int last_apv = 12;
 	
 	double apv_occupancy_mean[nAPVs];
 	//LABELS and Lines
 	TPaveLabel *tpl_apv_occupancy_mean_U[nAPVs];
+	TPaveLabel *tpl_apv_channel_to_strip[nAPVs];
 	TLine *tl_apv_occupancy_lines[nAPVs];
 
 	//Histogram with all individual APV occupancies
@@ -196,6 +205,9 @@ void xtalk(int runnum = 12060){
 	TH2D *h2_ADCmax = new TH2D("h2_ADCsamples", "", nstrips, 0, nstrips, nstrips, 0, nstrips);
 	TH2D *h2_U_ADCmax = new TH2D("h2_U_ADCmax", "", nstrips, 0, nstrips, max_U_ADC+50, 0, max_U_ADC+50);
 
+	TH1D *h_APV_U_ADCmax_apvstrip[nAPVs];
+	TH1D *h_APV_U_ADCmax_apvchan[nAPVs];
+
 	//This is a general histogram that will hold all the histograms for all of the APVs.
 	TH2D *h_apv_ADCmax_istrip[nAPVs];
 	TH2D *h2_APV_U_ADCmax_apvstrip[nAPVs];
@@ -207,44 +219,55 @@ void xtalk(int runnum = 12060){
 //******************      MAIN APV LOOP     ******************//	
 //************************************************************//
 	cout << endl << "Run number: " << runnum << endl;
-	cout << endl << "Calculating total occupancy on layer." << endl;
+	cout << endl << "ADC cut: " << ADC_cut << endl;
+	if(build_total_occupancy){cout << endl << "Calculating total occupancy on layer." << endl;}
 	
 	TH1D *h_total_occupancy = new TH1D("h_total_occupancy_all_strips", "", occupancy_bin_num, 0, 1);
 	TH1D *h_total_occupancy_U = new TH1D("h_total_occupancy_U", "", occupancy_bin_num, 0, 1);
 	int total_event_num = 0;
-	double total_occupancy = 0;
-	double total_occupancy_U = 0;
-	while(TC->GetEntry(total_event_num++)){
-		TC->GetEntry(total_event_num);
-		total_occupancy = nstrips_keep/(2*nstrips);
-		total_occupancy_U = nstrips_keepU/nstrips;
-		h_total_occupancy->Fill(total_occupancy);
-		h_total_occupancy_U->Fill(total_occupancy_U);
+	double total_occupancy = 0.0;
+	double total_occupancy_U = 0.0;
+
+	if(build_total_occupancy){
+		while(TC->GetEntry(total_event_num++)){
+			TC->GetEntry(total_event_num);
+			total_occupancy = nstrips_keep/(2.0*nstrips);
+			total_occupancy_U = nstrips_keepU/nstrips;
+			h_total_occupancy->Fill(total_occupancy);
+			h_total_occupancy_U->Fill(total_occupancy_U);
+		}
+
+		double last_occupancy_bin = (h_total_occupancy->FindLastBinAbove(0, 1) + 500)/double(occupancy_bin_num);
+		double last_occupancy_bin_U = (h_total_occupancy_U->FindLastBinAbove(0, 1) + 500)/double(occupancy_bin_num);
+		cout << "Finished calculating all total occupancies." << endl;
+
+		TCanvas *c_total_occupancy = new TCanvas("c_total_occupancy", "", 700, 500);
+		h_total_occupancy->Draw();
+		h_total_occupancy->SetTitle(Form("Total Occupancy On GEM, All strips, All events - Run: %i - ADCcut: %i", runnum, ADC_cut));
+		h_total_occupancy->GetXaxis()->SetTitle("Occupancy");
+		h_total_occupancy->SetAxisRange(0, last_occupancy_bin, "X");
+		h_total_occupancy->GetYaxis()->SetTitle("Entries");
+		// tpt_db_cuts->Draw();
+		c_total_occupancy->Update();
+		if(save_all){
+			c_total_occupancy->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/total_occupancy_%i_ADCcut_%i.pdf", runnum, ADC_cut, runnum, ADC_cut));
+			c_total_occupancy->Close();
+			gSystem->ProcessEvents();
+		}
+
+		TCanvas *c_total_occupancy_U = new TCanvas("c_total_occupancy_U", "", 700, 500);
+		h_total_occupancy_U->Draw();
+		h_total_occupancy_U->SetTitle(Form("Total Occupancy On GEM U Strips, ALL Events - Run: %i - ADCcut: %i", runnum, ADC_cut));
+		h_total_occupancy_U->GetXaxis()->SetTitle("Occupancy");
+		h_total_occupancy_U->SetAxisRange(0, last_occupancy_bin_U, "X");
+		h_total_occupancy_U->GetYaxis()->SetTitle("Entries");
+		c_total_occupancy_U->Update();
+		if(save_all){
+			c_total_occupancy_U->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/total_occupancy_U_%i_ADCcut_%i.pdf", runnum, ADC_cut, runnum, ADC_cut));
+			c_total_occupancy_U->Close();
+			gSystem->ProcessEvents();
+		}
 	}
-
-	double last_occupancy_bin = (h_total_occupancy->FindLastBinAbove(0, 1) + 500)/double(occupancy_bin_num);
-	double last_occupancy_bin_U = (h_total_occupancy_U->FindLastBinAbove(0, 1) + 500)/double(occupancy_bin_num);
-	cout << "Finished calculating all total occupancies." << endl;
-
-	TCanvas *c_total_occupancy = new TCanvas("c_total_occupancy", "", 700, 500);
-	h_total_occupancy->Draw();
-	h_total_occupancy->SetTitle(Form("Total Occupancy On GEM, All strips, All events - Run: %i", runnum));
-	h_total_occupancy->GetXaxis()->SetTitle("Occupancy");
-	h_total_occupancy->SetAxisRange(0, last_occupancy_bin, "X");
-	h_total_occupancy->GetYaxis()->SetTitle("Entries");
-	// tpt_db_cuts->Draw();
-	c_total_occupancy->Update();
-	c_total_occupancy->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/total_occupancy_%i.pdf", runnum));
-
-
-	TCanvas *c_total_occupancy_U = new TCanvas("c_total_occupancy_U", "", 700, 500);
-	h_total_occupancy_U->Draw();
-	h_total_occupancy_U->SetTitle(Form("Total Occupancy On GEM U Strips, ALL Events - Run: %i", runnum));
-	h_total_occupancy_U->GetXaxis()->SetTitle("Occupancy");
-	h_total_occupancy_U->SetAxisRange(0, last_occupancy_bin_U, "X");
-	h_total_occupancy_U->GetYaxis()->SetTitle("Entries");
-	c_total_occupancy_U->Update();
-	c_total_occupancy_U->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/total_occupancy_U_%i.pdf", runnum));
 	
 	cout << "Analyzing data for APVs " << first_apv << " through " << last_apv << "." << endl;
 
@@ -259,22 +282,26 @@ void xtalk(int runnum = 12060){
 		h_apv_ADCmax_istrip[apv_cnt] = new TH2D(Form("h2_APV%i_U_ADCmax_istrip",apv_cnt), "",128, APV_strip_nums(apv_cnt, "min"), APV_strip_nums(apv_cnt, "max"), max_U_ADC, 0, max_U_ADC );
 		h2_APV_U_ADCmax_apvstrip[apv_cnt] = new TH2D(Form("h2_APV%i_U_ADCmax_apvstrip", apv_cnt), "",128, 0, 128, max_U_ADC, 0, max_U_ADC );
 		h2_APV_U_ADCmax_apvchan[apv_cnt] = new TH2D(Form("h2_APV%i_U_ADCmax_apvchan", apv_cnt), "", 128, 0, 128, max_U_ADC, 0, max_U_ADC );
+
+		h_APV_U_ADCmax_apvstrip[apv_cnt] = new TH1D(Form("h_APV%i_U_ADCmax_apvstrip", apv_cnt), "",128, 0, 128);
+		h_APV_U_ADCmax_apvchan[apv_cnt] = new TH1D(Form("h_APV%i_U_ADCmax_apvchan", apv_cnt), "", 128, 0, 128);
+
 		h2_APV_U_ADCmax_neigh_chan[apv_cnt] = new TH2D(Form("h2_APV%i_U_ADCmax_neigh_chan", apv_cnt), "", max_U_ADC, 0, max_U_ADC,max_U_ADC,  0, max_U_ADC);
 		h2_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt] = new TH2D(Form("h2_APV%i_U_ADCmax_neigh_chan_lrg_sml", apv_cnt), "", max_U_ADC, 0, max_U_ADC,max_U_ADC,  0, max_U_ADC);
 
-		//We can either loop over all events or select some events:
-		//Loop over all events:
+		// //We can either loop over all events or select some events:
+		// //Loop over all events:
 		int apv_event_num = 0;
-		while(TC->GetEntry(apv_event_num++)){
-			TC->GetEntry(apv_event_num);
+		// while(TC->GetEntry(apv_event_num++)){
+		// 	TC->GetEntry(apv_event_num);
 
 		if(apv_event_num%10000 == 0){cout << "Analyzing event " << apv_event_num << " of " << TC->GetEntries() << " total events." << endl;}
 		// //Loop over selected events:
-		// for(int evt = 5; evt <= 5; evt++){
-		// 	cout << "ndata u: " << Ndata_IsU << endl;
-		// 	TC->GetEntry(evt);
+		for(int evt = 50; evt <= 50; evt++){
+			cout << "ndata u: " << Ndata_IsU << endl;
+			TC->GetEntry(evt);
 
-		
+
 			int occupancy_cnt = 0;
 
 			//Only look at U-strips and loop over them. We only look up to the number of U-strips fired (Ndata_IsU)
@@ -293,8 +320,12 @@ void xtalk(int runnum = 12060){
 						h_apv_ADCmax_istrip[apv_cnt]->Fill(istrip[i], ADC_max[i]); 
 						//Put the ADC value into the histograms for APV strips and Channels
 						h2_APV_U_ADCmax_apvstrip[apv_cnt]->Fill( int(istrip[i])%128, ADC_max[i] );
+						h_APV_U_ADCmax_apvstrip[apv_cnt]->SetBinContent( int(istrip[i])%128, ADC_max[i] );
+
 						//In these we need to convert the strip nubmers to the multiplexer APV channels
 						h2_APV_U_ADCmax_apvchan[apv_cnt]->Fill( UV_APV_strip_to_channel(int(istrip[i])%128), ADC_max[i]);
+						h_APV_U_ADCmax_apvchan[apv_cnt]->SetBinContent( UV_APV_strip_to_channel(int(istrip[i])%128), ADC_max[i]);
+						
 						//Fill an array with the maximum APV on each channel
 						apv_chan_adc[UV_APV_strip_to_channel(int(istrip[i])%128)][0] = UV_APV_strip_to_channel(int(istrip[i])%128);
 						apv_chan_adc[UV_APV_strip_to_channel(int(istrip[i])%128)][1] = ADC_max[i];
@@ -353,7 +384,7 @@ void xtalk(int runnum = 12060){
 		/////////////////////////
 		///////T-Graphs//////////
 		/////////////////////////
-		
+		cout << "got here, going to ploty!!!!!!!!!!!!!!!!!!!!!" << endl;
 		double apv_chan_adc_x[128];
 		double apv_chan_adc_y[128];
 		double apv_strip_adc_x[128];
@@ -366,7 +397,6 @@ void xtalk(int runnum = 12060){
 		for(int i=0; i<128; i++){
 			apv_chan_adc_x[i] = i;
 			apv_chan_adc_y[i] = apv_chan_adc[i][1];
-
 			apv_strip_adc_x[i] = i;
 			apv_strip_adc_y[i] = apv_strip_adc[i][1];
 		}
@@ -429,14 +459,52 @@ void xtalk(int runnum = 12060){
 		// c_adcmax_apvstrip[apv_cnt]->Update();
 
 		// // Plot APV 13 --> ADCmax vs Channels on the APV
-		// TCanvas *c_adcmax_apvchan[nAPVs];
-		// c_adcmax_apvchan[apv_cnt] = new TCanvas(Form("ADCmax vs APV channel - APV %i - U strips", apv_cnt), Form("c_adcmax_apvchan_apv%i", apv_cnt), 700, 500);
+		// TCanvas *c2_adcmax_apvchan[nAPVs];
+		// c2_adcmax_apvchan[apv_cnt] = new TCanvas(Form("ADCmax vs APV channel - APV %i - U strips", apv_cnt), Form("c_adcmax_apvchan_apv%i", apv_cnt), 700, 500);
 		// h2_APV_U_ADCmax_apvchan[apv_cnt]->Draw("B");
 		// h2_APV_U_ADCmax_apvchan[apv_cnt]->SetTitle("ADCmax vs APV channel - APV 13 - Ustrips only");
 		// h2_APV_U_ADCmax_apvchan[apv_cnt]->GetXaxis()->SetTitle("APV channels");
 		// h2_APV_U_ADCmax_apvchan[apv_cnt]->GetYaxis()->SetTitle("ADCmax");
 		// h2_APV_U_ADCmax_apvchan[apv_cnt]->SetMarkerStyle(2);
-		// c_adcmax_apvchan[apv_cnt]->Update();
+		// c2_adcmax_apvchan[apv_cnt]->Update();
+		
+	// Plot APV 13 --> ADCmax vs Channels on the APV ( 1-dD histogram)
+		TCanvas *c_adcmax_apvchan[nAPVs];
+		c_adcmax_apvchan[apv_cnt] = new TCanvas(Form("ADCmax vs APV channel - APV %i - U strips - Run: %i - Event: 50", apv_cnt, runnum), Form("c_adcmax_apvchan_apv%i", apv_cnt), 700, 500);
+		h_APV_U_ADCmax_apvchan[apv_cnt]->Draw();
+		h_APV_U_ADCmax_apvchan[apv_cnt]->SetTitle(Form("ADCmax vs APV channel - APV %i - U strips - Run: %i - Event: 50", apv_cnt, runnum));
+		h_APV_U_ADCmax_apvchan[apv_cnt]->GetXaxis()->SetTitle("APV Multiplexer Channels [n]");
+		h_APV_U_ADCmax_apvchan[apv_cnt]->GetYaxis()->SetTitle("ADCmax");
+		h_APV_U_ADCmax_apvchan[apv_cnt]->GetYaxis()->SetRange(0, h_APV_U_ADCmax_apvchan[apv_cnt]->GetMaximum()+300);
+		h_APV_U_ADCmax_apvchan[apv_cnt]->SetMarkerStyle(2);
+		h_APV_U_ADCmax_apvchan[apv_cnt]->SetMarkerColor(04);
+		for(int strip = 0; strip < 128; strip++){
+			if((h_APV_U_ADCmax_apvchan[apv_cnt]->GetBinContent(strip)) > 0.0){
+			// 	tpl_apv_channel_to_strip[apv_cnt] = new TPaveLabel(strip +.15, (h_APV_U_ADCmax_apvchan[apv_cnt]->GetBinContent(strip))*1.05, strip +.85, (h_APV_U_ADCmax_apvchan[apv_cnt]->GetBinContent(strip))*2.0, Form("To Strip #%i", UV_APV_strip_to_channel(strip)));
+			// // tpl_apv_occupancy_mean_U[apv] = new TPaveLabel(apv +.15, 140, apv +.85, 230, Form("APV %i, Mean = %0.3f", apv, h_APV_occupancy_U[apv]->GetMean()));
+			// tpl_apv_channel_to_strip[apv_cnt]->SetBorderSize(1);
+			// tpl_apv_channel_to_strip[apv_cnt]->SetTextAngle(90.);
+			// tpl_apv_channel_to_strip[apv_cnt]->SetTextFont(53);
+			// tpl_apv_channel_to_strip[apv_cnt]->SetTextSize(12);
+			// tpl_apv_channel_to_strip[apv_cnt]->Draw();
+				cout<< "Channel with hit: " << strip << endl;
+			}
+		}
+		c_adcmax_apvchan[apv_cnt]->Update();
+
+
+		// Plot APV 13 --> ADCmax vs Strips on the APV ( 1-dD histogram)
+		TCanvas *c_adcmax_apvstrip[nAPVs];
+		c_adcmax_apvstrip[apv_cnt] = new TCanvas(Form("ADCmax vs APV strip - APV %i - U strips - Run: %i - Event: 50", apv_cnt, runnum), Form("c_adcmax_apvstrip_apv%i", apv_cnt), 700, 500);
+		h_APV_U_ADCmax_apvstrip[apv_cnt]->Draw();
+		h_APV_U_ADCmax_apvstrip[apv_cnt]->SetTitle(Form("ADCmax vs APV strip - APV %i - U strips - Run: %i - Event: 50", apv_cnt, runnum));
+		h_APV_U_ADCmax_apvstrip[apv_cnt]->GetXaxis()->SetTitle("APV Physical Strips [n]");
+		h_APV_U_ADCmax_apvstrip[apv_cnt]->GetYaxis()->SetTitle("ADCmax");
+		h_APV_U_ADCmax_apvstrip[apv_cnt]->SetMarkerStyle(2);
+		h_APV_U_ADCmax_apvstrip[apv_cnt]->SetMarkerColor(04);
+		c_adcmax_apvchan[apv_cnt]->Update();	
+
+
 		
 		if(fit_gaus){
 			h_APV_U_ADCmax_chan_ratios[apv_cnt]->GetXaxis()->SetRangeUser(1, 9);
@@ -477,19 +545,21 @@ void xtalk(int runnum = 12060){
 			h_APV_U_ADCmax_chan_ratios[apv_cnt]->SetMarkerStyle(2);
 			h_APV_U_ADCmax_chan_ratios[apv_cnt]->SetMarkerColor(06);
 			c_adcmax_ratios_apv[apv_cnt]->Update();
+			
+			if(save_all){
+				if(apv_cnt == first_apv){
+					c_adcmax_ratios_apv[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf(", runnum, ADC_cut, runnum,ADC_cut));
+				}
+				else if (apv_cnt > first_apv && apv_cnt < (last_apv-1)){
+					c_adcmax_ratios_apv[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf", runnum, ADC_cut, runnum, ADC_cut));
+				}
 
-			if(apv_cnt == first_apv){
-				c_adcmax_ratios_apv[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf(", runnum,ADC_cut));
+				if(apv_cnt == (last_apv - 1)){
+					c_adcmax_ratios_apv[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf)", runnum, ADC_cut, runnum, ADC_cut));
+				}
+				c_adcmax_ratios_apv[apv_cnt]->Close();
+				gSystem->ProcessEvents();
 			}
-			else if (apv_cnt > first_apv && apv_cnt < (last_apv-1)){
-				c_adcmax_ratios_apv[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf", runnum, ADC_cut));
-			}
-
-			if(apv_cnt == (last_apv - 1)){
-				c_adcmax_ratios_apv[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf)", runnum, ADC_cut));
-			}
-			c_adcmax_ratios_apv[apv_cnt]->Close();
-			gSystem->ProcessEvents();
 		}
 		
 		
@@ -524,20 +594,23 @@ void xtalk(int runnum = 12060){
 				h_APV_occupancy_U[apv_cnt]->GetYaxis()->SetTitle("Entries");
 				h_APV_occupancy_U[apv_cnt]->SetAxisRange(0, last_APV_occupancy_bin_U, "X");
 				c_APV_occupancy_U[apv_cnt]->Update();
-			if(apv_cnt == first_apv){
-				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_occupancy_U_%i.pdf(", runnum));
-				// c_APV_occupancy_U[apv_cnt]->Clear();
+			
+			if(save_all){
+				if(apv_cnt == first_apv){
+					c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/APV_occupancy_U_%i.pdf(", runnum, ADC_cut, runnum));
+					// c_APV_occupancy_U[apv_cnt]->Clear();
+				}
+				else if (apv_cnt > first_apv && apv_cnt < (last_apv-1)){
+					c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/APV_occupancy_U_%i.pdf", runnum, ADC_cut, runnum));
+					// c_APV_occupancy_U[apv_cnt]->Clear();
+				}
+				if(apv_cnt == (last_apv - 1)){
+					c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/APV_occupancy_U_%i.pdf)", runnum, ADC_cut, runnum));
+					
+				}
+				c_APV_occupancy_U[apv_cnt]->Close();
+				gSystem->ProcessEvents();
 			}
-			else if (apv_cnt > first_apv && apv_cnt < (last_apv-1)){
-				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_occupancy_U_%i.pdf", runnum));
-				// c_APV_occupancy_U[apv_cnt]->Clear();
-			}
-			if(apv_cnt == (last_apv - 1)){
-				c_APV_occupancy_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_occupancy_U_%i.pdf)", runnum));
-				
-			}
-			c_APV_occupancy_U[apv_cnt]->Close();
-			gSystem->ProcessEvents();
 		}
 
 		//Put each APV occupancy histogram into the histogram for all APV h_all_APV_occupancies_U
@@ -578,10 +651,16 @@ void xtalk(int runnum = 12060){
 			tl_apv_occupancy_lines[apv]->Draw();
 			c_all_APV_occupancies_U->Update();
 		}
-
-		c_all_APV_occupancies_U->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_all_occupancies_%i.pdf", runnum));
+		if(save_all){
+			c_all_APV_occupancies_U->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/%i/ADCcut_%i/PV_all_occupancies_%i_ADCcut_%i.pdf", runnum, ADC_cut, runnum, ADC_cut));
+		}
 	}
 ///////////////////
 //END OF MAIN LOOP
 /////////////////////////////////////////////
+
+// auto stop = high_resolution_clock::now();
+// auto duration = duration_cast<minutes>(stop - start);	
+// cout << "Time elapsed: " << duration.count() << " minutes." << endl;
+
 }

@@ -5,20 +5,36 @@
 #include <math.h>
 #include <algorithm>
 #include <string>
+#include <chrono>
+using namespace std::chrono;
+#include "TGraph.h"
+#include "TMinuit.h"
 
 #include "./include/include_files.h"
 #include "./include/APV_strips.h"
 #include "./include/search_file.C"
 
+Double_t poly2_fit(Double_t *x, Double_t *par){
+	return par[0] + par[1]*x[0] + par[2]*x[0]*x[0];
+}
+
+Double_t gaus_fit(Double_t *x, Double_t *par){
+	return par[0]*exp((-0.5)*pow(((x[0] -  par[1])/par[2]),2));
+}
+
+//Fit functions for returning parameters:
+Double_t fitFunction(Double_t *x, Double_t *par){
+	return poly2_fit(x, par) + gaus_fit(x, &par[3]);
+}
+
 //Define some global variables
-int const ADC_cut = 700;
 int apv_chan_adc[128][2];
 int apv_strip_adc[128][2];
 
 int nAPVs = 30;
 int occupancy_bin_num = 10000;
-int first_apv = 10;
-int last_apv = 15;
+int first_apv = 13;
+int last_apv = 14;
 int ratio_bins = 300;
 
 //Set defaults for ADC on channel n and n+1
@@ -33,28 +49,25 @@ Int_t gaus_min_bin;
 Int_t gaus_max_bin;
 
 
-
-
-void apv_adc_ratios(int runnum = 13444){
+void apv_adc_ratios(int runnum = 13444, int const ADC_cut = 500){
+	auto start = high_resolution_clock::now();
 	TChain *TC = new TChain("T");
 
 	const char * DATA_DIR =  "/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk";
 	// const char * DATA_DIR = "/lustre19/expphy/volatile/halla/sbs/puckett/GMN_REPLAYS/rootfiles";
-	const char * protorootfile;
+	const char * protorootfile = Form("/%i/e1209019_replayed_%i.root", runnum, runnum);
 
-
-	// protorootfile = Form("/before_cuts/e1209019_replayed_%i.root", runnum);
-	// TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
-	// cout << "Input root file is: " << rootfile << endl;
-	// TC->Add( rootfile );
+	TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
+	cout << "Input root file is: " << rootfile << endl;
+	TC->Add( rootfile );
 
 	//Loop for TChain
-	for(int seg=0; seg < 10; seg++){
-		protorootfile = Form("/%i/e1209019_replayed_%i.root", runnum, runnum);
-		TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
-		TC->Add( rootfile );
+	// for(int seg=0; seg < 10; seg++){
+	// 	protorootfile = Form("/%i/e1209019_replayed_%i.root", runnum, runnum);
+	// 	TString rootfile = Form("%s%s", DATA_DIR, protorootfile);
+	// 	TC->Add( rootfile );
 		
-	}
+	// }
 
 	//CANVASES
 	TCanvas *c_APV_ratio_ADCmax_chan_U[nAPVs];
@@ -180,7 +193,7 @@ void apv_adc_ratios(int runnum = 13444){
 		
 //EVENT //Loop over selected events:
 
-		// for(int evt = 0; evt <= 50000; evt++){
+		// for(int evt = 500; evt <= 500; evt++){
 		
 		// 	// if(evt == 706 || evt == 1186) {continue;}
 		// 	cout << "evt: " << evt << endl;
@@ -239,33 +252,65 @@ void apv_adc_ratios(int runnum = 13444){
 		}
 		//END of EVENTS
 
+		//----------FITS------------//
+		// Double_t par[6];
+		Int_t lastXbin = (0.1)*h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetNbinsX();
+		cout << "last x bin: " << lastXbin << endl;
+
+		int gaus_last_point = 13;
+		h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetXaxis()->SetRangeUser(1, 9);
+		Double_t gaus_min_bin = (0.9)*((0.1)*(h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetMinimumBin()));
+		Double_t landau_max_bin = (1.25)*((0.1)*(h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetMinimumBin()));
+		h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetXaxis()->SetRangeUser(gaus_min_bin, gaus_last_point);
+
+		Double_t gaus_max_bin = (0.1)*(h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetMaximumBin());
+		h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetXaxis()->UnZoom();
+
+		cout << "***********************************" << endl << endl;
+		cout << "min bin: " << gaus_min_bin << "      maxb: " << gaus_max_bin << endl << endl;
+		cout << "***********************************" << endl << endl;
+		
+
 		c_APV_ratio_ADCmax_chan_U[apv_cnt] = new TCanvas(Form("APV%i Ratio of Channels - Ustrips", apv_cnt), Form("c_ratio_chan_apv_%i", apv_cnt), 700, 500);
 		h_APV_ratio_ADCmax_chan_U[apv_cnt]->Draw();
+		h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetXaxis()->UnZoom();
 		h_APV_ratio_ADCmax_chan_U[apv_cnt]->SetTitle(Form("APV Channel Ratios - Run: %d, APV: %i)", runnum, apv_cnt));
 		h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetXaxis()->SetTitle("ADC Ratio");
 		h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetYaxis()->SetTitle("Entries");
 		h_APV_ratio_ADCmax_chan_U[apv_cnt]->SetMarkerStyle(2);
 		h_APV_ratio_ADCmax_chan_U[apv_cnt]->SetMarkerColor(06);
+		h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetYaxis()->SetTitleOffset(1.5);
+		// h_APV_ratio_ADCmax_chan_U[apv_cnt]->SetStats(0);
+		
+		TF1 *fitFcn = new TF1("fitFcn", fitFunction, 1, 15, 6);
+		fitFcn->SetNpx(500);
+		fitFcn->SetParameters(1, 1, 1, 1, 1, 1);
+		h_APV_ratio_ADCmax_chan_U[apv_cnt]->Fit("fitFcn", "R");
+
+		// fitFcn->SetParameters(13789.1, -4465.81, 523.945, 7684.37, 8.95072, 3.56006);
+
 		c_APV_ratio_ADCmax_chan_U[apv_cnt]->Update();
+		
 
 		if(apv_cnt == first_apv){
-			c_APV_ratio_ADCmax_chan_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_chan_ratios_U_strips_all_%i_ADCcut_%i.pdf(", runnum, ADCcut));
+			c_APV_ratio_ADCmax_chan_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_chan_ratios_U_strips_all_%i_ADCcut_%i.pdf(", runnum, ADC_cut));
 		}
 		else if (apv_cnt > first_apv && apv_cnt < (last_apv-1)){
-			c_APV_ratio_ADCmax_chan_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf", runnum, ADCcut));
+			c_APV_ratio_ADCmax_chan_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf", runnum, ADC_cut));
 		}
 
 		if(apv_cnt == (last_apv - 1)){
 			c_APV_ratio_ADCmax_chan_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/APV_ratios_U_strips_all_%i_ADCcut_%i.pdf)", runnum, ADC_cut));
 		}
-		c_APV_ratio_ADCmax_chan_U[apv_cnt]->Close();
-		gSystem->ProcessEvents();
+		// c_APV_ratio_ADCmax_chan_U[apv_cnt]->Close();
+		// gSystem->ProcessEvents();
 
 	}
 	//END OF APVs
 
-	
-
+auto stop = high_resolution_clock::now();
+auto duration = duration_cast<minutes>(stop - start);	
+cout << "Time elapsed: " << duration.count() << " minutes." << endl;
 }
 
 
