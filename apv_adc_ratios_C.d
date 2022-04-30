@@ -1,14 +1,15 @@
 
 # DO NOT DELETE
 
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TGraph.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TNamed.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TObject.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/RConfigure.h
+./apv_adc_ratios_C.so: ./include/include_files.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TChain.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TTree.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/Compression.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/Rtypes.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/RtypesCore.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ROOT/RConfig.hxx
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/RVersion.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/RConfigure.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/DllImport.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/snprintf.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/strlcpy.h
@@ -16,6 +17,11 @@
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TSchemaHelper.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TIsAProxy.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVirtualIsAProxy.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ROOT/TIOFeatures.hxx
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TBasket.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TKey.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TNamed.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TObject.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TStorage.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVersionCheck.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/RVersion.h
@@ -27,41 +33,27 @@
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ROOT/TypeTraits.hxx
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ROOT/RSpan.hxx
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ROOT/span.hxx
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TAttLine.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TAttFill.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TAttMarker.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVectorFfwd.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVectorDfwd.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TFitResultPtr.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TMinuit.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TMethodCall.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TDictionary.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ESTLType.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TInterpreter.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TDataType.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TInterpreterValue.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVirtualRWMutex.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVirtualMutex.h
-./apv_adc_ratios_C.so: ./include/include_files.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TChain.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TTree.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/Compression.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ROOT/TIOFeatures.hxx
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TBasket.h
-./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TKey.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TDatime.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TBuffer.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TDataType.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TDictionary.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ESTLType.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TClass.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TObjArray.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TSeqCollection.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TCollection.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TIterator.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVirtualRWMutex.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVirtualMutex.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TObjString.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ThreadLocalStorage.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/Bytes.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TArrayD.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TArray.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TArrayI.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TAttFill.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TAttLine.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TAttMarker.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TBranch.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/ROOT/TBulkBranchRead.hxx
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TBranchCacheInfo.h
@@ -90,6 +82,9 @@
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TArrayF.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/Foption.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/Fit/FitExecutionPolicy.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVectorFfwd.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVectorDfwd.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TFitResultPtr.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TH2D.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TH2.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TMatrixFBasefwd.h
@@ -119,6 +114,10 @@
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TRotation.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TEventList.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TCut.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TMinuit.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TMethodCall.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TInterpreter.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TInterpreterValue.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TCanvas.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TPad.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TVirtualPad.h
@@ -154,6 +153,8 @@
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/Math/Types.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TF1AbsComposition.h
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/Math/ParamFunctor.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TGraph.h
+./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/TLegend.h
 ./apv_adc_ratios_C.so: ./include/APV_strips.h ./include/search_file.C
 ./apv_adc_ratios_C.so: /opt/ROOT/6.18-04/include/RVersion.h /opt/ROOT/6.18-04/include/RConfig.h /opt/ROOT/6.18-04/include/TClass.h /opt/ROOT/6.18-04/include/TDictAttributeMap.h /opt/ROOT/6.18-04/include/TInterpreter.h /opt/ROOT/6.18-04/include/TROOT.h /opt/ROOT/6.18-04/include/TBuffer.h /opt/ROOT/6.18-04/include/TMemberInspector.h /opt/ROOT/6.18-04/include/TError.h /opt/ROOT/6.18-04/include/RtypesImp.h /opt/ROOT/6.18-04/include/TIsAProxy.h /opt/ROOT/6.18-04/include/TFileMergeInfo.h /opt/ROOT/6.18-04/include/TCollectionProxyInfo.h /opt/ROOT/pro/bin/rootcling
 apv_adc_ratios_C__ROOTBUILDVERSION= 6.18/04

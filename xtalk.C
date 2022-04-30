@@ -26,6 +26,7 @@ Int_t gaus_max_bin;
 bool build_total_occupancy = false;
 bool build_APV_occupancy = true; 
 bool build_APV_occupancy_U = false;
+
 bool save_APV_occupancy_U = true;
 bool build_ratio_all = true;
 bool build_ratio_single = true;
@@ -48,7 +49,7 @@ void xtalk(int runnum = 12060, int const ADC_cut = 500){
 	TChain *TC = new TChain("T");
 	// const char * DATA_DIR = Form("/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/%i/", runnum);
 	// const char * DATA_DIR = Form("/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/%i/", runnum);
-	const char * DATA_DIR = "/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/";
+	const char * DATA_DIR = "/volatile/halla/sbs/jboyd/Rootfiles/xtalk/";
 	// const char * protorootfile = Form("%i/e1209019_fullreplay_%i_stream*", runnum, runnum);
 	const char * protorootfile = Form("%i/e1209019_replayed_%i.root", runnum, runnum);
 	// const char * protorootfile = Form("e1209019_replayed_%i_%s.root", runnum, cut);
@@ -384,7 +385,7 @@ void xtalk(int runnum = 12060, int const ADC_cut = 500){
 		/////////////////////////
 		///////T-Graphs//////////
 		/////////////////////////
-		cout << "got here, going to ploty!!!!!!!!!!!!!!!!!!!!!" << endl;
+	
 		double apv_chan_adc_x[128];
 		double apv_chan_adc_y[128];
 		double apv_strip_adc_x[128];
@@ -478,7 +479,7 @@ void xtalk(int runnum = 12060, int const ADC_cut = 500){
 		h_APV_U_ADCmax_apvchan[apv_cnt]->GetYaxis()->SetRange(0, h_APV_U_ADCmax_apvchan[apv_cnt]->GetMaximum()+300);
 		h_APV_U_ADCmax_apvchan[apv_cnt]->SetMarkerStyle(2);
 		h_APV_U_ADCmax_apvchan[apv_cnt]->SetMarkerColor(04);
-		for(int strip = 0; strip < 128; strip++){
+		for(int strip = 1; strip <= 128; strip++){
 			if((h_APV_U_ADCmax_apvchan[apv_cnt]->GetBinContent(strip)) > 0.0){
 			// 	tpl_apv_channel_to_strip[apv_cnt] = new TPaveLabel(strip +.15, (h_APV_U_ADCmax_apvchan[apv_cnt]->GetBinContent(strip))*1.05, strip +.85, (h_APV_U_ADCmax_apvchan[apv_cnt]->GetBinContent(strip))*2.0, Form("To Strip #%i", UV_APV_strip_to_channel(strip)));
 			// // tpl_apv_occupancy_mean_U[apv] = new TPaveLabel(apv +.15, 140, apv +.85, 230, Form("APV %i, Mean = %0.3f", apv, h_APV_occupancy_U[apv]->GetMean()));

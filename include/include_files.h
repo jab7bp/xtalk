@@ -30,3 +30,8 @@
 #include "TPaveText.h"
 #include "TText.h"
 #include "TF1.h"
+#include "TH2D.h"
+
+#include "TGraph.h"
+#include "TMinuit.h"
+#include "TLegend.h"
