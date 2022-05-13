@@ -12,6 +12,8 @@ using namespace std::chrono;
 #include "./include/include_files.h"
 #include "./include/APV_strips.h"
 #include "./include/search_file.C"
+#include "./include/draw_plots.h"
+#include "./include/save_outputs.h"
 
 Double_t fitFunc(Double_t * x, Double_t *par){
 
@@ -29,17 +31,19 @@ Double_t fitFunc(Double_t * x, Double_t *par){
 	return total_fit;
 }
 
+TFile *outputRootFile = new TFile("apv_adc_ratios_histogram_99.root", "RECREATE");
 
 //Define some global variables
 int apv_chan_adc[128][2];
+int apv_chan_adc_crosstalk_reject[128][2];
 int apv_strip_adc[128][2];
 
 double apv_adc_cut_thresh = 50.0;
 
 int nAPVs = 30;
 int occupancy_bin_num = 10000;
-int first_apv = 13;
-int last_apv = 14;
+int first_apv = 0;
+int last_apv = 30;
 int ratio_bins = 300;
 int nstrips_keep_cut;
 
@@ -73,16 +77,31 @@ bool build_all = false;
 bool build_occupancies = true;
 bool build_ratios = false;
 
-
-
 void apv_adc_ratios(int const ADC_cut = 500){
+
+	ofstream myfile;
+	myfile.open("crosstalk_v_occupancy_U.txt");
+	myfile << Form("ADCcut; %i", ADC_cut) << Form("; Noise_cut; %i", int(apv_adc_cut_thresh)) << endl;
+	myfile << "run	occupancy	occupancy_U		crosstalk	gaus_mean	gaus_sigma	Ndata_ADCmax	Ndata_ADCmax_cut	Ndata_IsU	Ndata_IsU_cut		\n \n";
+
 	auto start = high_resolution_clock::now();
-	// int runs[] = {11562};
+	int runs[] = {11562};
 	// int runs[] = {11449, 11451, 11456, 11494, 11562, 11580, 11595, 11997, 12001, 12013, 12030, 12050, 12060, 12073, 12342, 12423, 12424, 12425};
-	int runs[] = {11449, 11451, 11456, 11494, 11562, 11580, 11595, 11997, 12001, 12013, 12030, 12050, 12060, 12073, 12342, 12423, 12424, 12425, 12550, 12620, 12662, 12728, 13060, 13309, 13325, 13344, 13370, 13400, 13454, 13474, 13505, 13554, 13560, 13615, 13620, 13660, 13661, 13664, 13666, 13680, 13685, 13732, 13770, 13799};
+	// int runs[] = {11449, 11451, 11456, 11494, 11562, 11580, 11595, 11997, 12001, 12013, 12030, 12050, 12060, 12073, 12342, 12423, 12424, 12425, 12550, 12620, 12662, 12728, 13060, 13309, 13325, 13344, 13370, 13400, 13454, 13474, 13505, 13554, 13560, 13615, 13620, 13660, 13661, 13664, 13666, 13680, 13685, 13732, 13770, 13799};
 	int num_runs = (sizeof(runs)/sizeof(runs[0]));
+
 	double arr_xtalk_v_occupancies[num_runs][2];
 	double arr_xtalk_v_occupancies_U[num_runs][2];
+
+	double arr_occupancy[num_runs];
+	double arr_occupancy_U[num_runs];
+	double arr_crosstalk[num_runs];
+	double arr_gaus_mean[num_runs];
+	double arr_gaus_sigma[num_runs];
+	double arr_Ndata_ADCmax[num_runs];
+	double arr_Ndata_ADCmax_cut[num_runs];
+	double arr_Ndata_IsU[num_runs];
+	double arr_Ndata_IsU_cut[num_runs];
 
 	//-------HISTOGRAMS FOR STORING INFO ACROSS RUNS Occupancies---------------
 	TH1D *h_xtalk_v_occupancies_runs = new TH1D(Form("h_xtalk_v_occupancies_runs_%i_%i", runs[0], runs[num_runs-1]), "", occupancy_bin_num, 0, 1);
@@ -113,6 +132,7 @@ void apv_adc_ratios(int const ADC_cut = 500){
 		TCanvas *c_APV_ratio_ADCmax_chan_U[nAPVs];
 		TCanvas *c_APV_ratio_source_mean4_ADCmax_chan_U[nAPVs];
 		TCanvas *c_APV_ratio_source_mean9_ADCmax_chan_U[nAPVs];
+		TCanvas *c_APV_ratio_source_upper_ratios_ADCmax_chan_U[nAPVs];
 
 		//Turn off all Branches to save memory/time
 		TC->SetBranchStatus("*", false);
@@ -203,16 +223,20 @@ void apv_adc_ratios(int const ADC_cut = 500){
 		
 		
 		//---------Total Occupancies--------------
-		TH1D *h_total_occupancy = new TH1D("h_total_occupancy_all_strips", "", occupancy_bin_num, 0, 1);
-		TH1D *h_total_occupancy_U = new TH1D("h_total_occupancy_U", "", occupancy_bin_num, 0, 1);
+		TH1D *h_total_occupancy[num_runs];
+		h_total_occupancy[irun] = new TH1D(Form("h_total_occupancy_all_strips_%i", runs[irun]), "", occupancy_bin_num, 0, 1);
+		TH1D *h_total_occupancy_U[num_runs];
+		h_total_occupancy_U[irun] = new TH1D(Form("h_total_occupancy_U_%i", runs[irun]), "", occupancy_bin_num, 0, 1);
 
 		//2-D histograms
 		TH2D *h2_ADCmax_U = new TH2D("h2_ADCmax_samples_U", "" , nstrips, 0, nstrips, nstrips, 0, nstrips);
 
 		TH1D *h_APV_ratio_ADCmax_chan_U[nAPVs];
+		TH1D *h_APV_ratio_larger_ADC[nAPVs];
+		TH1D *h_APV_ratio_smaller_ADC[nAPVs];
 		TH2D *h2_APV_ratio_source_mean4_ADCmax_chan_U[nAPVs];
 		TH2D *h2_APV_ratio_source_mean9_ADCmax_chan_U[nAPVs];
-		
+		TH2D *h2_APV_ratio_source_upper_ratios_ADCmax_chan_U[nAPVs];
 
 		cout << endl << "Run number: " << runnum << endl;
 		cout << endl << "Analyzing data for APVs " << first_apv << " up to " << last_apv << "." << endl << endl;
@@ -231,18 +255,19 @@ void apv_adc_ratios(int const ADC_cut = 500){
 		//Create ratio histogram entry for each APV
 
 			h_APV_ratio_ADCmax_chan_U[apv_cnt] = new TH1D(Form("h_APV%i_ratio_ADCmax_chan_U", apv_cnt), "", ratio_bins, 0, nAPVs);
-			TH1D *h_APV_ratio_larger_ADC = new TH1D(Form("h_APV%i_ratio_larger_adc", apv_cnt), "", nstrips, 0, nstrips);
-			TH1D *h_APV_ratio_smaller_ADC = new TH1D(Form("h_APV%i_ratio_smaller_adc", apv_cnt), "", nstrips, 0, nstrips);
+			h_APV_ratio_larger_ADC[apv_cnt] = new TH1D(Form("h_APV%i_ratio_larger_adc", apv_cnt), "", ratio_bins, 0, nstrips);
+			h_APV_ratio_smaller_ADC[apv_cnt] = new TH1D(Form("h_APV%i_ratio_smaller_adc", apv_cnt), "", 750, 0, 750);
 
 		//Hisogram for Analyzing ratio contributions at different ratio values
 
-			h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt] = new TH2D(Form("h2_APV%i_ratio_source_mean4_ADCmax_chan_U", apv_cnt), "", nstrips, 0, nstrips, ratio_bins, 0, nstrips);
-			h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt] = new TH2D(Form("h2_APV%i_ratio_source_mean9_ADCmax_chan_U", apv_cnt), "", nstrips, 0, nstrips, ratio_bins, 0, nstrips);
+			h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt] = new TH2D(Form("h2_APV%i_ratio_source_mean4_ADCmax_chan_U", apv_cnt), "", 750, 0, 750, ratio_bins, 0, nstrips);
+			h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt] = new TH2D(Form("h2_APV%i_ratio_source_mean9_ADCmax_chan_U", apv_cnt), "", 750, 0, 750, ratio_bins, 0, nstrips);
+			h2_APV_ratio_source_upper_ratios_ADCmax_chan_U[apv_cnt] = new TH2D(Form("h2_APV%i_ratio_source_upper_ratios_ADCmax_chan_U", apv_cnt), "", 750, 0, 750, ratio_bins, 0, nstrips);
 
 		
 	//EVENT //Loop all selected events:		
-			We can either loop over all events or select some events:
-			Loop over all events:
+			// We can either loop over all events or select some events:
+			// Loop over all events:
 
 			int apv_event_num = 0;
 			while(TC->GetEntry(apv_event_num++)){
@@ -326,8 +351,8 @@ void apv_adc_ratios(int const ADC_cut = 500){
 				// total_occupancy_U = nstrips_keepU/nstrips;
 				total_occupancy = Ndata_strip_ADC_max_keep/(2.0*nstrips);
 				total_occupancy_U = Ndata_strip_ADC_max_keepU/(1.0*nstrips);
-				h_total_occupancy->Fill(total_occupancy);
-				h_total_occupancy_U->Fill(total_occupancy_U);
+				h_total_occupancy[irun]->Fill(total_occupancy);
+				h_total_occupancy_U[irun]->Fill(total_occupancy_U);
 
 
 				//End of looping through U-Strips
@@ -338,13 +363,16 @@ void apv_adc_ratios(int const ADC_cut = 500){
 					chan_n_plus_1_ADC = apv_chan_adc[j+1][1];
 					ADC_ratio = 0.0;
 					
+
+					
+
 					//Always take larger ADC divided by smaller ADC for neighboring channels
 					if(chan_n_adc > chan_n_plus_1_ADC && chan_n_plus_1_ADC != 0 && chan_n_adc > ADC_cut){
 						double ADC_ratio = chan_n_adc/chan_n_plus_1_ADC;
 						h_APV_ratio_ADCmax_chan_U[apv_cnt]->Fill(ADC_ratio);
 
-						h_APV_ratio_larger_ADC->Fill(chan_n_adc);
-						h_APV_ratio_smaller_ADC->Fill(chan_n_plus_1_ADC);
+						h_APV_ratio_larger_ADC[apv_cnt]->Fill(chan_n_adc);
+						h_APV_ratio_smaller_ADC[apv_cnt]->Fill(chan_n_plus_1_ADC);
 						
 						//Ratio Sources --> Larger value on Y, smaller value on X
 						//For ratios around a value of 4
@@ -353,8 +381,12 @@ void apv_adc_ratios(int const ADC_cut = 500){
 						}
 
 						//For ratios around a value of 10
-						if( (ADC_ratio > 7.5) && (ADC_ratio < 10.5) ){
+						if( (ADC_ratio > 7.5) && (ADC_ratio < 11.5) ){
 							h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->Fill(chan_n_plus_1_ADC, chan_n_adc);
+						}
+
+						if( (ADC_ratio > 17) ){
+							h2_APV_ratio_source_upper_ratios_ADCmax_chan_U[apv_cnt]->Fill(chan_n_plus_1_ADC, chan_n_adc);
 						}
 
 					}
@@ -362,8 +394,8 @@ void apv_adc_ratios(int const ADC_cut = 500){
 						double ADC_ratio = chan_n_plus_1_ADC/chan_n_adc;
 						h_APV_ratio_ADCmax_chan_U[apv_cnt]->Fill(ADC_ratio);
 
-						h_APV_ratio_larger_ADC->Fill(chan_n_plus_1_ADC);
-						h_APV_ratio_smaller_ADC->Fill(chan_n_adc);
+						h_APV_ratio_larger_ADC[apv_cnt]->Fill(chan_n_plus_1_ADC);
+						h_APV_ratio_smaller_ADC[apv_cnt]->Fill(chan_n_adc);
 						
 						//Ratio Sources --> Larger value on Y, smaller value on X
 						//For ratios around a value of 4
@@ -372,8 +404,12 @@ void apv_adc_ratios(int const ADC_cut = 500){
 						}
 						
 						//For ratios around a value of 10
-						if( (ADC_ratio > 7.5) && (ADC_ratio < 10.5) ){
-							h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->Fill(chan_n_adc, chan_n_plus_1_ADC);;
+						if( (ADC_ratio > 7.5) && (ADC_ratio < 11.5) ){
+							h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->Fill(chan_n_adc, chan_n_plus_1_ADC);
+						}
+
+						if( (ADC_ratio > 17) ){
+							h2_APV_ratio_source_upper_ratios_ADCmax_chan_U[apv_cnt]->Fill(chan_n_adc, chan_n_plus_1_ADC);
 						}
 					}
 				}
@@ -404,7 +440,7 @@ void apv_adc_ratios(int const ADC_cut = 500){
 			c_APV_ratio_ADCmax_chan_U[apv_cnt] = new TCanvas(Form("APV%i Ratio of Channels - Ustrips", apv_cnt), Form("c_ratio_chan_apv_%i", apv_cnt), 700, 500);
 			h_APV_ratio_ADCmax_chan_U[apv_cnt]->Draw();
 			h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetXaxis()->UnZoom();
-			h_APV_ratio_ADCmax_chan_U[apv_cnt]->SetTitle(Form("APV Channel Ratios - Run: %d, APV: %i, ADCcut: %i)", runnum, apv_cnt, ADC_cut));
+			h_APV_ratio_ADCmax_chan_U[apv_cnt]->SetTitle(Form("APV Channel Ratios - Run: %d, APV: %i, ADCcut: %i, Noise cut: %i)", runnum, apv_cnt, ADC_cut, int(apv_adc_cut_thresh)));
 			h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetXaxis()->SetTitle("ADC Ratio");
 			h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetYaxis()->SetTitle("Entries");
 			h_APV_ratio_ADCmax_chan_U[apv_cnt]->SetMarkerStyle(2);
@@ -433,17 +469,28 @@ void apv_adc_ratios(int const ADC_cut = 500){
 
 			// Initial parameters for expo - gaus1 - gaus2
 			// Good parameters for ADCcut 300 & 500:
+			// myFitFunc->SetParameters(9.30973, -2.26944e-01, 8000, 4.0, 8.96587, 1.16e+06, 5, 47.73);
+
+			// myFitFunc->SetParLimits(0, 9.25, 10.75);
+			// myFitFunc->SetParLimits(1, -12.10, -1.15);
+			// myFitFunc->SetParLimits(2, 0, gaus1_max_val);
+			// myFitFunc->SetParLimits(3, 5, 15);
+			// myFitFunc->SetParLimits(4, 1, 3);
+			// myFitFunc->SetParLimits(5, 0, 100000);
+			// myFitFunc->SetParLimits(6, 2, 8);
+			// myFitFunc->SetParLimits(7, 0, 100000);
+
 			myFitFunc->SetParameters(9.30973, -2.26944e-01, 8000, 4.0, 8.96587, 1.16e+06, 5, 47.73);
-
-			myFitFunc->SetParLimits(0, 9.25, 10.75);
-			myFitFunc->SetParLimits(1, -12.10, -1.15);
+			// myFitFunc->SetParLimits(0, 9.25, 10.75);
+			myFitFunc->SetParLimits(0, 9.25, 13.74);
+			myFitFunc->SetParLimits(1, -12.10, -0.50);
 			myFitFunc->SetParLimits(2, 0, gaus1_max_val);
-			myFitFunc->SetParLimits(3, 3.75, 15);
-			myFitFunc->SetParLimits(4, 1, 3);
-			myFitFunc->SetParLimits(5, 0, 100000);
-			myFitFunc->SetParLimits(6, 2, 8);
-			myFitFunc->SetParLimits(7, 0, 100000);
-
+			myFitFunc->SetParLimits(3, 5, 12);
+			myFitFunc->SetParLimits(4, .5, 2.5);
+			myFitFunc->SetParLimits(5, 0, 4000);
+			myFitFunc->SetParLimits(6, 18, 24);
+			myFitFunc->SetParLimits(7, 0, 7);
+			
 			// //ADCcut 200
 			// myFitFunc->SetParameters(9.30973, -2.26944e-01, 8000, 4.0, 8.96587, 1.16e+06, 5, 47.73);
 
@@ -506,6 +553,7 @@ void apv_adc_ratios(int const ADC_cut = 500){
 			gr_expo->Draw("same");
 			gr_gaus1->Draw("same");
 			gr_gaus2->Draw("same");
+
 			
 			crosstalk_mean = gr_gaus1->GetMean();
 			
@@ -525,9 +573,28 @@ void apv_adc_ratios(int const ADC_cut = 500){
 			legend->AddEntry(gr_expo, "expo fit", "l");
 			legend->AddEntry(gr_gaus1, "gaus fit #1", "l");
 			legend->AddEntry(gr_gaus2, "gaus fit #2", "l");
+			legend->AddEntry(myFitFunc, Form("Fit Chi-2: %f", fit_chi), "l");
 			legend->Draw("same");
 			h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetYaxis()->SetRangeUser(0, h_APV_ratio_ADCmax_chan_U[apv_cnt]->GetMaximum());
 			c_APV_ratio_ADCmax_chan_U[apv_cnt]->Update();
+
+			outputRootFile->WriteObject(h_APV_ratio_ADCmax_chan_U[apv_cnt], Form("h_APV%i_ratio_ADCmax_chan_U_run%i", apv_cnt, runs[irun]));
+			
+			print_single_PDF(c_APV_ratio_ADCmax_chan_U[apv_cnt], Form("multirun_APV_channel_ratios_U_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), first_apv, apv_cnt, last_apv);
+
+			// if(irun == 0){
+			// 	c_APV_ratio_ADCmax_chan_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/multirun_APV%i_channel_ratios_U_ADCcut_%i_NoiseCut_%i.pdf(", ADC_cut, apv_cnt, ADC_cut, int(apv_adc_cut_thresh)));
+			// }
+			// else if (irun > 0 && irun < (num_runs-1)){
+			// 	c_APV_ratio_ADCmax_chan_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/multirun_APV%i_channel_ratios_U_ADCcut_%i_NoiseCut_%i.pdf", ADC_cut, apv_cnt, ADC_cut, int(apv_adc_cut_thresh)));
+			// }
+
+			// if(irun == (num_runs - 1)){
+			// 	c_APV_ratio_ADCmax_chan_U[apv_cnt]->Print(Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/multirun_APV%i_channel_ratios_U_ADCcut_%i_NoiseCut_%i.pdf)", ADC_cut, apv_cnt, ADC_cut, int(apv_adc_cut_thresh)));
+			// }
+			// // c_APV_ratio_ADCmax_chan_U[apv_cnt]->Close();
+			// gSystem->ProcessEvents();
+			
 			
 
 			// if(apv_cnt == first_apv){
@@ -547,111 +614,126 @@ void apv_adc_ratios(int const ADC_cut = 500){
 		//------------------------------------------------------------------
 		//------------Ratios and ratio-related plots
 
-			if(false){
-				TH1D *px_ratio_mean4 = h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->ProjectionX("px_ratio_mean4", 0, -1);
-				TH1D *py_ratio_mean4 = h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->ProjectionY("py_ratio_mean4", 0, -1);
+			if(true){
 
-				TH1D *px_ratio_mean9 = h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->ProjectionX("px_ratio_mean9",0, -1);
-				TH1D *py_ratio_mean9 = h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->ProjectionY("py_ratio_mean9",0, -1);
+				TH1D *h_px_ratio_mean4[nAPVs];
+				TH1D *h_py_ratio_mean4[nAPVs];
+				TH1D *h_px_ratio_mean9[nAPVs];
+				TH1D *h_py_ratio_mean9[nAPVs];
+				TH1D *h_px_ratio_upper_ratios[nAPVs];
+				TH1D *h_py_ratio_upper_ratios[nAPVs];
+
+				h_px_ratio_mean4[apv_cnt] = h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->ProjectionX("h_px_ratio_mean4", 0, -1);
+				h_py_ratio_mean4[apv_cnt] = h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->ProjectionY("h_py_ratio_mean4", 0, -1);
+
+				h_px_ratio_mean9[apv_cnt] = h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->ProjectionX("h_px_ratio_mean9",0, -1);
+				h_px_ratio_mean9[apv_cnt]->GetXaxis()->SetRange(0, 500);
+				h_py_ratio_mean9[apv_cnt] = h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->ProjectionY("h_py_ratio_mean9",0, -1);
+
+				h_px_ratio_upper_ratios[apv_cnt] = h2_APV_ratio_source_upper_ratios_ADCmax_chan_U[apv_cnt]->ProjectionX("h_px_ratio_upper_ratios", 0, -1);
+				h_px_ratio_upper_ratios[apv_cnt]->GetXaxis()->SetRange(0, 300);
+				h_py_ratio_upper_ratios[apv_cnt] = h2_APV_ratio_source_upper_ratios_ADCmax_chan_U[apv_cnt]->ProjectionY("h_py_ratio_upper_ratios", 0, -1);
 
 
 				//Plotting Ratio sources
-				c_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt] = new TCanvas(Form("c_APV%i_ratio_source_mean4_ADCmax_chan_U", apv_cnt), "", 700, 500);
-				h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->Draw("colz");
-				h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->SetTitle(Form("Ratio - Large ADC vs Smaller ADC for Ratios = 3 thru 5, Run: %i, ADCcut = %i", runnum, ADC_cut));
-				h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->GetXaxis()->SetTitle("ADC of Denominator");
-				h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->GetYaxis()->SetTitle("ADC of Numerator");
-				c_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt]->Update();
+				bool first = false;
+				bool last = false;
+				if(apv_cnt == first_apv){first = true;}
+				else if(apv_cnt == last_apv-1){last = true;}
 
-				c_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt] = new TCanvas(Form("c_APV%i_ratio_source_mean9_ADCmax_chan_U", apv_cnt), "", 700, 500);
-				h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->Draw("colz");
-				h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->SetTitle(Form("Ratio - Large ADC vs Smaller ADC for Ratios = 7.5 thru 10.5, Run: %i, ADCcut = %i", runnum, ADC_cut));
-				h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->GetXaxis()->SetTitle("ADC of Denominator");
-				h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->GetYaxis()->SetTitle("ADC of Numerator");
-				c_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt]->Update();
+				cout << "first: " << first << "  last: " << last << "  apv_cnt: " << apv_cnt << endl;
 
-				TCanvas *c_px_ratio_mean4 = new TCanvas("c_px_ratio_mean4", "", 700, 500);
-				px_ratio_mean4->Draw("colz");
-				px_ratio_mean4->SetTitle(Form("Proj X: Ratio - Large ADC vs Smaller ADC for Ratios = 3 thru 5, Run %i, ADCcut = %i", runnum, ADC_cut));
-				px_ratio_mean4->GetXaxis()->SetTitle("ADC");
-				px_ratio_mean4->GetYaxis()->SetTitle("Entries");
-				c_px_ratio_mean4->Update();
+				outputRootFile->WriteObject(h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt], Form("h2_APV%i_ratio_source_mean4_ADCmax_chan_U", apv_cnt));
 
-				TCanvas *c_py_ratio_mean4 = new TCanvas("c_py_ratio_mean4", "", 700, 500);
-				py_ratio_mean4->Draw("colz");
-				py_ratio_mean4->SetTitle(Form("Proj Y: Ratio - Large ADC vs Smaller ADC for Ratios = 3 thru 5, Run: %i, ADCcut = %i", runnum, ADC_cut));
-				py_ratio_mean4->GetXaxis()->SetTitle("ADC");
-				py_ratio_mean4->GetYaxis()->SetTitle("Entries");
-				c_py_ratio_mean4->Update();
+				TCanvas *c_APV_ratio_source_mean4_ADCmax_chan_U = plot_2DH(h2_APV_ratio_source_mean4_ADCmax_chan_U[apv_cnt], Form("c_APV%i_ratio_source_mean4_ADCmax_chan_U", apv_cnt), Form("APV%i Ratio - Large ADC vs Smaller ADC for Ratios = 3 thru 5, Run: %i, ADCcut = %i", apv_cnt, runnum, ADC_cut), "ADC of Denominator", "ADC of Numerator", "colz");
+				print_multi_PDF(c_APV_ratio_source_mean4_ADCmax_chan_U, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), first, false);
 
-				TCanvas *c_px_ratio_mean9 = new TCanvas("c_px_ratio_mean9", "", 700, 500);
-				px_ratio_mean9->Draw("colz");
-				px_ratio_mean9->SetTitle(Form("Proj X: Ratio - Large ADC vs Smaller ADC for Ratios = 7.5 thru 10.5, Run: %i, ADCcut = %i", runnum, ADC_cut));
-				px_ratio_mean9->GetXaxis()->SetTitle("ADC");
-				px_ratio_mean9->GetYaxis()->SetTitle("Entries)");
-				c_px_ratio_mean9->Update();
+				outputRootFile->WriteObject(h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt], Form("h2_APV%i_ratio_source_mean9_ADCmax_chan_U", apv_cnt));
 
-				TCanvas *c_py_ratio_mean9 = new TCanvas("c_py_ratio_mean9", "", 700, 500);
-				py_ratio_mean9->Draw("colz");
-				py_ratio_mean9->SetTitle(Form("Proj Y: Ratio - Large ADC vs Smaller ADC for Ratios = 7.5 thru 10.5, Run: %i, ADCcut = %i", runnum, ADC_cut));
-				py_ratio_mean9->GetXaxis()->SetTitle("ADC");
-				py_ratio_mean9->GetYaxis()->SetTitle("Entries");
-				c_py_ratio_mean9->Update();
+				TCanvas *c_APV_ratio_source_mean9_ADCmax_chan_U = plot_2DH(h2_APV_ratio_source_mean9_ADCmax_chan_U[apv_cnt], Form("c_APV%i_ratio_source_mean9_ADCmax_chan_U", apv_cnt), Form("APV%i Ratio - Large ADC vs Smaller ADC for Ratios = 7.5 thru 11.5, Run: %i, ADCcut = %i", apv_cnt, runnum, ADC_cut), "ADC of Denominator", "ADC of Numerator", "colz");
+				print_multi_PDF(c_APV_ratio_source_mean9_ADCmax_chan_U, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), false, false);
+
+				outputRootFile->WriteObject(h2_APV_ratio_source_upper_ratios_ADCmax_chan_U[apv_cnt], Form("h2_APV%i_ratio_source_upper_ratios_ADCmax_chan_U", apv_cnt));
+
+				TCanvas *c_APV_ratio_source_upper_ratios_ADCmax_chan_U = plot_2DH(h2_APV_ratio_source_upper_ratios_ADCmax_chan_U[apv_cnt], Form("c_APV%i_ratio_source_upper_ratios_ADCmax_chan_U", apv_cnt), Form("APV%i Ratio - Large ADC vs Smaller ADC for Ratios Greater Than 17, Run: %i, ADCcut = %i, Noise cut = %i", apv_cnt, runnum, ADC_cut, int(apv_adc_cut_thresh)), "ADC of Denominator", "ADC of Numerator", "colz");
+				print_multi_PDF(c_APV_ratio_source_upper_ratios_ADCmax_chan_U, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), false, false);
+
+				outputRootFile->WriteObject(h_px_ratio_mean4[apv_cnt], Form("h2_APV%i_px_ratio_source_mean4_ADCmax_chan_U", apv_cnt));
+
+				TCanvas *c_px_ratio_mean4 = plot_1DH(h_px_ratio_mean4[apv_cnt], "c_px_ratio_mean4", Form("APV%i Proj X: Ratio - Large ADC vs Smaller ADC for Ratios = 3 thru 5, Run %i, ADCcut = %i, Noise cut = %i", apv_cnt, runnum, ADC_cut, int(apv_adc_cut_thresh)), "ADC", "Entries", "colz");
+				print_multi_PDF(c_px_ratio_mean4, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), false, false);
+				
+				outputRootFile->WriteObject(h_py_ratio_mean4[apv_cnt], Form("h2_APV%i_py_ratio_source_mean4_ADCmax_chan_U", apv_cnt));
+				
+				TCanvas *c_py_ratio_mean4 = plot_1DH(h_py_ratio_mean4[apv_cnt], "c_py_ratio_mean4", Form("APV%i Proj Y: Ratio - Large ADC vs Smaller ADC for Ratios = 3 thru 5, Run: %i, ADCcut = %i, Noise cut = %i", apv_cnt, runnum, ADC_cut, int(apv_adc_cut_thresh)), "ADC", "Entries", "colz");
+				print_multi_PDF(c_py_ratio_mean4, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), false, false);
+
+				outputRootFile->WriteObject(h_px_ratio_mean9[apv_cnt], Form("h2_APV%i_px_ratio_source_mean9_ADCmax_chan_U", apv_cnt));
+				
+				TCanvas *c_px_ratio_mean9 = plot_1DH(h_px_ratio_mean9[apv_cnt], "c_px_ratio_mean9", Form("APV%i Proj X: Ratio - Large ADC vs Smaller ADC for Ratios = 7.5 thru 11.5, Run: %i, ADCcut = %i, Noise cut = %i", apv_cnt, runnum, ADC_cut, int(apv_adc_cut_thresh)), "ADC", "Entries)", "colz");
+				print_multi_PDF(c_px_ratio_mean9, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), false, false);
+
+				outputRootFile->WriteObject(h_py_ratio_mean9[apv_cnt], Form("h2_APV%i_py_ratio_source_mean9_ADCmax_chan_U", apv_cnt));
+
+				TCanvas *c_py_ratio_mean9 = plot_1DH(h_py_ratio_mean9[apv_cnt], "c_py_ratio_mean9", Form("APV%i Proj Y: Ratio - Large ADC vs Smaller ADC for Ratios = 7.5 thru 11.5, Run: %i, ADCcut = %i, Noise cut = %i", apv_cnt, runnum, ADC_cut, int(apv_adc_cut_thresh)), "ADC", "Entries)", "colz");
+				print_multi_PDF(c_py_ratio_mean9, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), false, false);
+
+				outputRootFile->WriteObject(h_px_ratio_upper_ratios[apv_cnt], Form("h2_APV%i_px_ratio_source_upper_ratios_ADCmax_chan_U", apv_cnt));
+
+				TCanvas *c_px_ratio_upper_ratios = plot_1DH(h_px_ratio_upper_ratios[apv_cnt], "c_px_ratio_upper_ratios",Form("APV%i Proj X: Ratio - Large ADC vs Smaller ADC for Ratios Greater Than 17, Run %i, ADCcut = %i, Noise cut = %i", apv_cnt, runnum, ADC_cut, int(apv_adc_cut_thresh)), "ADC", "Entries", "colz");
+				print_multi_PDF(c_px_ratio_upper_ratios, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), false, false);
+
+				outputRootFile->WriteObject(h_py_ratio_upper_ratios[apv_cnt], Form("h2_APV%i_py_ratio_source_upper_ratios_ADCmax_chan_U", apv_cnt));
+
+				TCanvas *c_py_ratio_upper_ratios = plot_1DH(h_py_ratio_upper_ratios[apv_cnt], "c_py_ratio_upper_ratios",Form("APV%i Proj Y: Ratio - Large ADC vs Smaller ADC for Ratios Greater Than 17, Run %i, ADCcut = %i, Noise cut = %i", apv_cnt, runnum, ADC_cut, int(apv_adc_cut_thresh)), "ADC", "Entries", "colz");
+				print_multi_PDF(c_py_ratio_upper_ratios, Form("APV_ratio_sources_various_region_plots_ADCcut_%i_NoiseCut_%i", ADC_cut, int(apv_adc_cut_thresh)), Form("/work/halla/sbs/jboyd/analysis/xtalk/plots/ratio/ADCcut_%i/", ADC_cut), false, last);
 			}
+			outputRootFile->WriteObject(h_APV_ratio_larger_ADC[apv_cnt], Form("h_APV%i_ratio_larger_ADC", apv_cnt));
+			plot_1DH(h_APV_ratio_larger_ADC[apv_cnt], "c_APV_ratio_larger", Form("Larger ADC of Ratio Calc, Run: %i, ADCcut = %i", runnum, ADC_cut), "ADC", "Entries");
 
-			// TCanvas *c_APV_ratio_larger = new TCanvas("c_APV_ratio_larger", "", 700, 500);
-			// h_APV_ratio_larger_ADC->Draw();
-			// h_APV_ratio_larger_ADC->SetTitle(Form("Larger ADC of Ratio Calc, Run: %i, ADCcut = %i", runnum, ADC_cut));
-			// h_APV_ratio_larger_ADC->GetXaxis()->SetTitle("ADC");
-			// h_APV_ratio_larger_ADC->GetYaxis()->SetTitle("Entries");
-			// c_APV_ratio_larger->Update();
-
-			// TCanvas *c_APV_ratio_smaller = new TCanvas("ca_APV_ratio_smaller", "", 700, 500);
-			// h_APV_ratio_smaller_ADC->Draw();
-			// h_APV_ratio_smaller_ADC->SetTitle(Form("Smaller ADC of Ratio Calc, Run: %i, ADCcut = %i", runnum, ADC_cut));
-			// h_APV_ratio_smaller_ADC->GetXaxis()->SetTitle("ADC");
-			// h_APV_ratio_smaller_ADC->GetYaxis()->SetTitle("Entries");
-			// c_APV_ratio_smaller->Update();
-			TCanvas *c_total_occupancy = new TCanvas("c_total_occupancy", "", 700, 500);
-			h_total_occupancy->Draw();
-			h_total_occupancy->SetTitle(Form("Total Occupancy on All Strips, Run: %i, ADCcut = %i, Noise cut = %i", runnum, ADC_cut, int(apv_adc_cut_thresh)));
-			h_total_occupancy->GetXaxis()->SetTitle("Occupancy");
-			h_total_occupancy->GetYaxis()->SetTitle("Entries");
-			c_total_occupancy->Update();
-
-			TCanvas *c_total_occupancy_U = new TCanvas("c_total_occupancy_U", "", 700, 500);
-			h_total_occupancy_U->Draw();
-			h_total_occupancy_U->SetTitle(Form("Total Occupancy on All U Strips, Run: %i, ADCcut = %i, Noise cut = %i", runnum, ADC_cut, int(apv_adc_cut_thresh)));
-			h_total_occupancy_U->GetXaxis()->SetTitle("Occupancy on U Strips");
-			h_total_occupancy_U->GetYaxis()->SetTitle("Entries");
-			c_total_occupancy_U->Update();
+			outputRootFile->WriteObject(h_APV_ratio_smaller_ADC[apv_cnt], Form("h_APV%i_ratio_smaller_ADC", apv_cnt));
+			plot_1DH(h_APV_ratio_smaller_ADC[apv_cnt], "c_APV_ratio_smaller", Form("Smaller ADC of Ratio Calc, Run: %i, ADCcut = %i", runnum, ADC_cut), "ADC", "Entries");
 
 		}
 		//END OF APVs
-		double final_total_occupancy_U = h_total_occupancy_U->GetMean();
-		arr_xtalk_v_occupancies[irun][0] = h_total_occupancy->GetMean();
+		double final_total_occupancy_U = h_total_occupancy_U[irun]->GetMean();
+		arr_xtalk_v_occupancies[irun][0] = h_total_occupancy[irun]->GetMean();
 		arr_xtalk_v_occupancies[irun][1] = crosstalk_occupancy;
-		arr_xtalk_v_occupancies_U[irun][0] = h_total_occupancy_U->GetMean();
+		arr_xtalk_v_occupancies_U[irun][0] = h_total_occupancy_U[irun]->GetMean();
 		arr_xtalk_v_occupancies_U[irun][1] = crosstalk_occupancy_U;
 
-		cout << "occ: " << arr_xtalk_v_occupancies_U[0][0] << "   xtalk U: " << arr_xtalk_v_occupancies_U[0][1] << "  xtalk U all: " << crosstalk_occupancy << endl;
-		cout << "final occupancy_U: " << final_total_occupancy_U << "    crosstalk occupancy: " << crosstalk_occupancy << endl;
+		arr_occupancy[irun] = h_total_occupancy[irun]->GetMean();
+		arr_occupancy_U[irun] = h_total_occupancy_U[irun]->GetMean();
+		arr_gaus_mean[irun] = xtalk_mean;
+		arr_gaus_sigma[irun] = xtalk_sigma;
+		arr_Ndata_ADCmax[irun] = Ndata_strip_ADC_max;
+		arr_Ndata_ADCmax_cut[irun] = Ndata_strip_ADC_max_keep;
+		arr_Ndata_IsU[irun] = count_in_isu;
+		arr_Ndata_IsU_cut[irun] = Ndata_strip_ADC_max_keepU;
+
+		outputRootFile->WriteObject(h_total_occupancy[irun], Form("h_total_occupancy_%i", runs[irun]));
+		plot_1DH(h_total_occupancy[irun], "c_total_occupancy", Form("Total Occupancy on All Strips, Run: %i, ADCcut = %i, Noise cut = %i", runnum, ADC_cut, int(apv_adc_cut_thresh)), "Occupancy", "Entries");
+
+		outputRootFile->WriteObject(h_total_occupancy_U[irun], Form("h_total_occupancy_U_%i", runs[irun]));
+		plot_1DH(h_total_occupancy_U[irun], "c_total_occupancy_U", Form("Total Occupancy on All U Strips, Run: %i, ADCcut = %i, Noise cut = %i", runnum, ADC_cut, int(apv_adc_cut_thresh)), "Occupancy on U Strips", "Entries");
 		
+		cout << "**************************************************" << endl;
+		cout << "Occupancy on U strips: " << arr_xtalk_v_occupancies_U[0][0] << "   Xtalk Occupancy (aginst U): " << arr_xtalk_v_occupancies_U[0][1] << "  Xtalk occupancy (Against All strips): " << crosstalk_occupancy << endl;
+		cout << "Occupancy on U mean: " << final_total_occupancy_U << endl;
+		cout << "Crosstalk Gaussian mean: " << xtalk_mean << "  sigma: " << xtalk_sigma << endl;
+
+		myfile << runs[irun] << "; " << arr_xtalk_v_occupancies[irun][0] << "; " << arr_xtalk_v_occupancies_U[irun][0] << "; " << arr_xtalk_v_occupancies_U[irun][1] << "; " << xtalk_mean << "; " << xtalk_sigma << "; " << Ndata_strip_ADC_max << "; " << Ndata_strip_ADC_max_keep << "; " << count_in_isu << "; " << Ndata_strip_ADC_max_keepU << endl;
+		cout << "**************************************************" << endl;
 		
 	}
 	//END of RUNS Loop
 	
 //print out the crosstalk array stuff:
-cout << "Crosstalk Gaussian mean: " << xtalk_mean << "  sigma: " << xtalk_sigma << endl;
+
 
 TH1D *h_xtalk_v_occupancy = new TH1D("h_xtalk_v_occupancy", "", 1000, 0, 1);
 
-ofstream myfile;
-myfile.open("crosstalk_v_occupancy_U.txt");
-myfile << "run	occupancy	occupancy_U		crosstalk	gaus_mean	gaus_sigma	Ndata_ADCmax	Ndata_ADCmax_cut	Ndata_IsU	Ndata_IsU_cut		\n \n";
-myfile << "-------------------------" << endl;	
 for(int i = 0; i< num_runs; i++){
-	myfile << runs[i] << "; " << arr_xtalk_v_occupancies[i][0] << "; " << arr_xtalk_v_occupancies_U[i][0] << "; " << arr_xtalk_v_occupancies_U[i][1] << "; " << xtalk_mean << "; " << xtalk_sigma << "; " << Ndata_strip_ADC_max << "; " << Ndata_strip_ADC_max_keep << "; " << count_in_isu << "; " << Ndata_strip_ADC_max_keepU << endl;
 	h_xtalk_v_occupancy->SetBinContent(1000*arr_xtalk_v_occupancies_U[i][0], arr_xtalk_v_occupancies_U[i][1]);
 }
 
@@ -661,6 +743,8 @@ h_xtalk_v_occupancy->SetTitle(Form("Crosstalk Occupancy vs Total Cccupancy on U-
 h_xtalk_v_occupancy->GetXaxis()->SetTitle("Total Occupancy on U-Strips");
 h_xtalk_v_occupancy->GetYaxis()->SetTitle("Crosstalk Occupancy");
 c_xtalk_v_occupancy->Update();
+
+// plot_1DH(h_xtalk_v_occupancy, "xtalk_v_occupancy", Form("Crosstalk Occupancy vs Total Cccupancy on U-Strips, ADCcut = %i, Noise Cut = %i", ADC_cut, int(apv_adc_cut_thresh)), "Total Occupancy on U-Strips", "Crosstalk Occupancy", {0.0, 0.0}, {0.0, 0.0});
 
 auto stop = high_resolution_clock::now();
 auto duration = duration_cast<minutes>(stop - start);	

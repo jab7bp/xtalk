@@ -1,14 +1,14 @@
 
 # DO NOT DELETE
 
-./graph_C.so: ./include/include_files.h /opt/ROOT/6.18-04/include/TChain.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TTree.h
-./graph_C.so: /opt/ROOT/6.18-04/include/Compression.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TStyle.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TNamed.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TObject.h
+./graph_C.so: /opt/ROOT/6.18-04/include/RConfigure.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/Rtypes.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/RtypesCore.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/ROOT/RConfig.hxx
 ./graph_C.so: /opt/ROOT/6.18-04/include/RVersion.h
-./graph_C.so: /opt/ROOT/6.18-04/include/RConfigure.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/DllImport.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/snprintf.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/strlcpy.h
@@ -16,11 +16,6 @@
 ./graph_C.so: /opt/ROOT/6.18-04/include/TSchemaHelper.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TIsAProxy.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TVirtualIsAProxy.h
-./graph_C.so: /opt/ROOT/6.18-04/include/ROOT/TIOFeatures.hxx
-./graph_C.so: /opt/ROOT/6.18-04/include/TBasket.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TKey.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TNamed.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TObject.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TStorage.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TVersionCheck.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/RVersion.h
@@ -32,6 +27,20 @@
 ./graph_C.so: /opt/ROOT/6.18-04/include/ROOT/TypeTraits.hxx
 ./graph_C.so: /opt/ROOT/6.18-04/include/ROOT/RSpan.hxx
 ./graph_C.so: /opt/ROOT/6.18-04/include/ROOT/span.hxx
+./graph_C.so: /opt/ROOT/6.18-04/include/TAttAxis.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TAttLine.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TAttFill.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TAttText.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TAttMarker.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TArrayI.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TArray.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TColor.h ./include/include_files.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TChain.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TTree.h
+./graph_C.so: /opt/ROOT/6.18-04/include/Compression.h
+./graph_C.so: /opt/ROOT/6.18-04/include/ROOT/TIOFeatures.hxx
+./graph_C.so: /opt/ROOT/6.18-04/include/TBasket.h
+./graph_C.so: /opt/ROOT/6.18-04/include/TKey.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TDatime.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TBuffer.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TDataType.h
@@ -48,11 +57,6 @@
 ./graph_C.so: /opt/ROOT/6.18-04/include/ThreadLocalStorage.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/Bytes.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TArrayD.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TArray.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TArrayI.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TAttFill.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TAttLine.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TAttMarker.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TBranch.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/ROOT/TBulkBranchRead.hxx
 ./graph_C.so: /opt/ROOT/6.18-04/include/TBranchCacheInfo.h
@@ -75,7 +79,6 @@
 ./graph_C.so: /opt/ROOT/6.18-04/include/TH1D.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TH1.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TAxis.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TAttAxis.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TArrayC.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TArrayS.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TArrayF.h
@@ -122,7 +125,6 @@
 ./graph_C.so: /opt/ROOT/6.18-04/include/TVirtualPad.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TAttPad.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TVirtualX.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TAttText.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/GuiTypes.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/Buttons.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TQObject.h
@@ -137,8 +139,6 @@
 ./graph_C.so: /opt/ROOT/6.18-04/include/TSysEvtHandler.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TTime.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TROOT.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TColor.h
-./graph_C.so: /opt/ROOT/6.18-04/include/TStyle.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/THistPainter.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TVirtualHistPainter.h
 ./graph_C.so: /opt/ROOT/6.18-04/include/TPave.h

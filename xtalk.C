@@ -14,7 +14,11 @@ using namespace std::chrono;
 
 //Define some global variables
 
+double ratio_cut = 9.0;
+
 int apv_chan_adc[128][2];
+int apv_chan_adc_crosstalk_reject[128][2];
+int apv_chan_adc_crosstalk_reject_flag[128] = {0};
 int apv_strip_adc[128][2];
 int nstrips = 3840;
 Int_t max_strips = 8000;
@@ -43,15 +47,30 @@ TF1 *xtalk_fit;
 // 	tpt_db_cuts->AddText(db_cuts[cut_cnt]);
 // }
 
-void xtalk(int runnum = 12060, int const ADC_cut = 500){ 
+TH1D *ratio_calc(TH1D *h_adc_chan, int apv_cnt, double chan_n_adc, double chan_n_plus_1_ADC, int ADC_cut){
+
+	//Always take larger ADC divided by smaller ADC for neighboring channels
+	if(chan_n_adc > chan_n_plus_1_ADC && chan_n_plus_1_ADC != 0 && chan_n_adc > ADC_cut){
+		double ADC_ratio = chan_n_adc/chan_n_plus_1_ADC;
+		h_adc_chan->Fill(ADC_ratio);
+	}
+	else if(chan_n_plus_1_ADC > chan_n_adc && chan_n_adc != 0 && chan_n_plus_1_ADC > ADC_cut){
+		double ADC_ratio = chan_n_plus_1_ADC/chan_n_adc;
+		h_adc_chan->Fill(ADC_ratio);
+	}
+	return h_adc_chan;
+}
+
+
+void xtalk(int runnum = 11562, int const ADC_cut = 500){ 
 
 	// auto start = high_resolution_clock::now();
 	TChain *TC = new TChain("T");
 	// const char * DATA_DIR = Form("/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/%i/", runnum);
 	// const char * DATA_DIR = Form("/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk/%i/", runnum);
-	const char * DATA_DIR = "/volatile/halla/sbs/jboyd/Rootfiles/xtalk/";
+	const char * DATA_DIR = "/lustre19/expphy/volatile/halla/sbs/jboyd/Rootfiles/xtalk";
 	// const char * protorootfile = Form("%i/e1209019_fullreplay_%i_stream*", runnum, runnum);
-	const char * protorootfile = Form("%i/e1209019_replayed_%i.root", runnum, runnum);
+	const char * protorootfile = Form("/%i/e1209019_replayed_%i.root", runnum, runnum);
 	// const char * protorootfile = Form("e1209019_replayed_%i_%s.root", runnum, cut);
 	// const char * protorootfile = Form("%i/e1209019_fullreplay_%i_*", runnum, runnum);
 	// const char * protorootfile = Form("*%i*%s*", runnum, cut);
@@ -208,6 +227,7 @@ void xtalk(int runnum = 12060, int const ADC_cut = 500){
 
 	TH1D *h_APV_U_ADCmax_apvstrip[nAPVs];
 	TH1D *h_APV_U_ADCmax_apvchan[nAPVs];
+	TH1D *h_APV_U_ADCmax_apvchan_crosstalk_reject[nAPVs];
 
 	//This is a general histogram that will hold all the histograms for all of the APVs.
 	TH2D *h_apv_ADCmax_istrip[nAPVs];
@@ -286,6 +306,7 @@ void xtalk(int runnum = 12060, int const ADC_cut = 500){
 
 		h_APV_U_ADCmax_apvstrip[apv_cnt] = new TH1D(Form("h_APV%i_U_ADCmax_apvstrip", apv_cnt), "",128, 0, 128);
 		h_APV_U_ADCmax_apvchan[apv_cnt] = new TH1D(Form("h_APV%i_U_ADCmax_apvchan", apv_cnt), "", 128, 0, 128);
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt] = new TH1D(Form("h_APV%i_U_ADCmax_apvchan", apv_cnt), "", 128, 0, 128);
 
 		h2_APV_U_ADCmax_neigh_chan[apv_cnt] = new TH2D(Form("h2_APV%i_U_ADCmax_neigh_chan", apv_cnt), "", max_U_ADC, 0, max_U_ADC,max_U_ADC,  0, max_U_ADC);
 		h2_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt] = new TH2D(Form("h2_APV%i_U_ADCmax_neigh_chan_lrg_sml", apv_cnt), "", max_U_ADC, 0, max_U_ADC,max_U_ADC,  0, max_U_ADC);
@@ -331,6 +352,9 @@ void xtalk(int runnum = 12060, int const ADC_cut = 500){
 						apv_chan_adc[UV_APV_strip_to_channel(int(istrip[i])%128)][0] = UV_APV_strip_to_channel(int(istrip[i])%128);
 						apv_chan_adc[UV_APV_strip_to_channel(int(istrip[i])%128)][1] = ADC_max[i];
 
+						apv_chan_adc_crosstalk_reject[UV_APV_strip_to_channel(int(istrip[i])%128)][0] = UV_APV_strip_to_channel(int(istrip[i])%128);
+						apv_chan_adc_crosstalk_reject[UV_APV_strip_to_channel(int(istrip[i])%128)][1] = ADC_max[i];
+
 						apv_strip_adc[int(istrip[i])%128][0] = istrip[i];
 						apv_strip_adc[int(istrip[i])%128][1] = ADC_max[i];
 
@@ -364,19 +388,26 @@ void xtalk(int runnum = 12060, int const ADC_cut = 500){
 					double chan_n_plus_1_ADC = apv_chan_adc[i+1][1];
 					double ADC_ratio = 0.0;
 
-					//Always take larger ADC divided by smaller ADC for neighboring channels
+					ratio_calc(h_APV_U_ADCmax_chan_ratios[apv_cnt], apv_cnt, chan_n_adc, chan_n_plus_1_ADC, ADC_cut);
+
+	//Crosstalk Rejection
 					if(chan_n_adc > chan_n_plus_1_ADC && chan_n_plus_1_ADC != 0 && chan_n_adc > ADC_cut){
 						double ADC_ratio = chan_n_adc/chan_n_plus_1_ADC;
-						h_APV_U_ADCmax_chan_ratios[apv_cnt]->Fill(ADC_ratio);
-						// h2_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt]->Fill(chan_n_adc, chan_n_plus_1_ADC);
+						if(ADC_ratio > ratio_cut){
+							apv_chan_adc_crosstalk_reject[i+1][1] = 0;
+							apv_chan_adc_crosstalk_reject_flag[i+1] = 1;
+						}
 					}
 					else if(chan_n_plus_1_ADC > chan_n_adc && chan_n_adc != 0 && chan_n_plus_1_ADC > ADC_cut){
 						double ADC_ratio = chan_n_plus_1_ADC/chan_n_adc;
-						h_APV_U_ADCmax_chan_ratios[apv_cnt]->Fill(ADC_ratio);
-						// h2_APV_U_ADCmax_neigh_chan_lrg_sml[apv_cnt]->Fill(chan_n_plus_1_ADC, chan_n_adc);
+						if(ADC_ratio > ratio_cut){
+							apv_chan_adc_crosstalk_reject[i][1] = 0;
+							apv_chan_adc_crosstalk_reject_flag[i] = 1;
+						}
 					}
-					//Fill channel n on the y-axis. Fill channel n+1 on the x-axis. 
-					// h2_APV_U_ADCmax_neigh_chan[apv_cnt]->Fill(chan_n_plus_1_ADC, chan_n_adc);
+				}
+				for(int i = 0; i < 127; i++){
+					h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->SetBinContent(i, apv_chan_adc_crosstalk_reject[i][1]);
 				}
 			}
 		//End of looping through events
@@ -492,6 +523,27 @@ void xtalk(int runnum = 12060, int const ADC_cut = 500){
 			}
 		}
 		c_adcmax_apvchan[apv_cnt]->Update();
+
+		TCanvas *c_adcmax_apvchan_crosstalk_reject[nAPVs];
+		c_adcmax_apvchan_crosstalk_reject[apv_cnt] = new TCanvas(Form("Crosstalk Rejected: ADCmax vs APV channel - APV %i - U strips - Run: %i - Event: 50", apv_cnt, runnum), Form("c_adcmax_apvchan_apv%i", apv_cnt), 700, 500);
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->SetStats(0);
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->Draw();
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->SetTitle(Form("Crosstalk Rejected: ADCmax vs APV channel - APV %i - U strips - Run: %i - Event: 50", apv_cnt, runnum));
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->GetXaxis()->SetTitle("APV Multiplexer Channels [n]");
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->GetYaxis()->SetTitle("ADCmax");
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->GetYaxis()->SetRange(0, h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->GetMaximum()+300);
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->SetMarkerStyle(2);
+		h_APV_U_ADCmax_apvchan_crosstalk_reject[apv_cnt]->SetMarkerColor(04);
+		c_adcmax_apvchan_crosstalk_reject[apv_cnt]->Update();
+		TPaveText * pt_rejected_chan = new TPaveText(100.0, 850, 120, 950);
+		if(TMath::MaxElement(128, apv_chan_adc_crosstalk_reject_flag) != 0){pt_rejected_chan->AddText("Crosstalk Rejects:");}
+		for(int i = 0; i< 127; i++){
+			if(apv_chan_adc_crosstalk_reject_flag[i] == 1){
+				pt_rejected_chan->AddText(Form("Ch. %i", i));
+			}
+		}
+		pt_rejected_chan->Draw("same");
+		
 
 
 		// Plot APV 13 --> ADCmax vs Strips on the APV ( 1-dD histogram)
